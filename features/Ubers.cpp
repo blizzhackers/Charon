@@ -47,6 +47,8 @@ REMOTEFUNC(D2::Types::UnitAny* __fastcall, SpawnMonster, (IncompleteGameData* pG
 REMOTEFUNC(DWORD __fastcall, SpawnPortal, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, D2::Types::Room1* pDrlgRoom, int nX, int nY, DWORD eD2LevelId, D2::Types::UnitAny** param_7, int nClassId, DWORD param_9), 0x56D130);
 REMOTEFUNC(void __fastcall, OpenPortal, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, DWORD LevelId), 0x5A9930);
 REMOTEFUNC(DWORD __stdcall, GetAct, (int levelId), 0x6427f0);
+REMOTEFUNC(char* __stdcall, GetTCData, (WORD nTreasureClass, int level), 0x654E00);
+REMOTEFUNC(void __fastcall, RollItemToDrop, (IncompleteGameData* pGame, D2::Types::UnitAny* pVictim, D2::Types::UnitAny* pAttacker, char* pTCData, int param_5, int level, bool bIsItemFindDrop, D2::Types::UnitAny** pUnitTable, void* pUnitIndex, int param_10), 0x55A6D0);
 
 ASMPTR CowsCubeOutputHook = 0x565a80;
 ASMPTR CubeKeysHook = 0x565a90;
@@ -246,6 +248,10 @@ __declspec(naked) void __fastcall KillMonster_Relocated(IncompleteGameData* pGam
     }
 }
 
+struct inspection {
+    void* data[256];
+};
+
 void __fastcall KillMonster_Hook(IncompleteGameData* pGame, D2::Types::UnitAny* pVictim, D2::Types::UnitAny* pAttacker, BOOL bRemoveFromOwner) {
     switch (pVictim->dwTxtFileNo) {
     case 704:
@@ -265,6 +271,9 @@ void __fastcall KillMonster_Hook(IncompleteGameData* pGame, D2::Types::UnitAny* 
     }
 
     KillMonster_Relocated(pGame, pVictim, pAttacker, bRemoveFromOwner);
+    char *tc = GetTCData(1, 110);
+    inspection* test = (inspection*)tc;
+    RollItemToDrop(pGame, pVictim, pAttacker, tc, 0, 20, true, nullptr, nullptr, 0);
 }
 
 namespace Ubers {
