@@ -33,3 +33,5 @@ extern GameOutput gamelog;
 namespace D2 {
     extern int ScreenWidth, ScreenHeight;
 }
+
+#pragma warning(disable : 4100)

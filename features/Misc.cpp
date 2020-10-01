@@ -15,6 +15,7 @@
 REMOTEREF(int, DrawAutoMapStatsOffsetY, 0x7A51BC);
 REMOTEREF(D2::Types::UnitAny*, CurrentTooltipItem, 0x7BCBF4);
 REMOTEFUNC(BYTE __stdcall, GetMaxSocketCount, (D2::Types::UnitAny *pItem), 0x62BC20);
+REMOTEFUNC(int, FUN_0047a560, (), 0x47a560);
 
 Dialog splashDialog;
 
@@ -160,6 +161,7 @@ void SplashScreenHook() {
     splashDialog.show();
 }
 
+static DWORD automapTextOffset = 0;
 void _drawAutoMapInfo(DWORD size) {
     DWORD width = 0, height = 0, fileno = 1;
     height = D2::GetTextSize(L"test", &width, &fileno);
@@ -169,16 +171,30 @@ void _drawAutoMapInfo(DWORD size) {
         bottom += D2::GetTextSize(msg.c_str(), &width, &fileno);
         D2::DrawGameText(msg.c_str(), D2::ScreenWidth - 16 - width, bottom, 4, 0);
     }
+    automapTextOffset = bottom;
 }
 
-HMODULE __stdcall multi(LPSTR Class, LPSTR Window) {
-    return 0;
+void __fastcall DrawRepairImageAlertIntercept(void *pImage, bool isArrow) {
+    int x = D2::ScreenWidth - (isArrow ? 0x38 : 0x3C), y = 0;
+
+    if (D2::GetUiFlag(0xA)) {
+        y = (FUN_0047a560() ? 0x2B : 0) + DrawAutoMapStatsOffsetY + automapTextOffset;
+    }
+    else {
+        y = 0x6E;
+    }
+
+    if (isArrow) {
+        y += 0x2D;
+    }
+
+    D2::DrawImage(pImage, x, y, -1, isArrow ? 5 : 1, nullptr);
 }
 
 ASMPTR GetItemName_Original = 0x48C060;
-ASMPTR GetItemName_Rejoin = 0x48C068;
 
 __declspec(naked) BOOL __fastcall GetItemName_Relocated(D2::Types::UnitAny* item, wchar_t* wBuffer, DWORD dwSize) {
+    static ASMPTR GetItemName_Rejoin = 0x48C068;
     __asm {
         push ebp
         mov ebp, esp
@@ -325,6 +341,20 @@ void __stdcall GetGlobalLight(void* pAct, BYTE &red, BYTE &green, BYTE &blue) {
     GetGlobalLight_Original(pAct, &red, &green, &blue);
 }
 
+wchar_t* __fastcall UnitVisualname(D2::Types::UnitAny *pUnit) {
+    // For now it falls under item info, as it is as item/unit level
+    if (!Settings["itemInfo"]) return D2::GetUnitName(pUnit);
+
+    const size_t dwSize = 1024;
+    // Since it returns directly to an append function we just need one static
+    // buffer here to reuse, because there's no guarantee that the stack will be
+    // preserved. Also Visual Studio complains about returning a temporary variable.
+    static wchar_t tmpBuffer[dwSize];
+
+    swprintf(tmpBuffer, dwSize, L"%ls (%d)", D2::GetUnitName(pUnit), D2::GetUnitStat(pUnit, 12/*level*/, 0));
+    return tmpBuffer;
+}
+
 // This feature class registers itself.
 class : public Feature {
 public:
@@ -332,7 +362,7 @@ public:
         SplashScreenDialogSetup();
         MemoryPatch(0x42fb40) << CALL(SplashScreenHook);
 
-		MemoryPatch(0x4F5623) << CALL(multi) << ASM::NOP; // Allow multiple windows open
+        MemoryPatch(0x4F5623) << BYTESEQ{ 0xC7, 0xC0, 0, 0, 0, 0 }; // Allow multiple windows open
         MemoryPatch(0x476D40) << ASM::RET; // Ignore shaking requests
         MemoryPatch(0x43BF60) << ASM::RET; // Prevent battle.net connections
         MemoryPatch(0x61C0B0) << JUMP(GetGlobalLight);
@@ -353,6 +383,11 @@ public:
 
         MemoryPatch(0x65C34E) << JUMP(GetQuestState_Intercept);
         MemoryPatch(0x45ADE8) << CALL(_drawAutoMapInfo);
+        MemoryPatch(0x454ba8) << CALL(UnitVisualname);
+
+        // Repair/Arrow adjustments modified from jaenster's code
+        MemoryPatch(0x497D72) << BYTESEQ{ 0x8D, 0x4D, 0xB8, 0xBA } << DWORD(0) << CALL(DrawRepairImageAlertIntercept) << BYTESEQ{ 0x5F, 0x5E, 0x8B, 0xE5, 0x5D, 0xC2, 0x04, 0 };
+        MemoryPatch(0x497CBA) << BYTESEQ{ 0x8D, 0x4D, 0xB8, 0xBA } << DWORD(1) << CALL(DrawRepairImageAlertIntercept) << BYTESEQ{ 0x5F, 0x5E, 0x8B, 0xE5, 0x5D, 0xC2, 0x04, 0 };
 
         AutomapInfoHooks.push_back([]() -> std::wstring {
             return version;

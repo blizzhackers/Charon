@@ -87,19 +87,19 @@ bool __fastcall ChatCommandProcessor(char* msg) {
     std::wstring wMsg(tmp.begin(), tmp.end());
 
     for (Feature* f = Features; f; f = f->next) {
-        std::wstringstream msg(wMsg);
+        std::wstringstream wsMsg(wMsg);
 
-        if (!f->chatInput(msg)) {
+        if (!f->chatInput(wsMsg)) {
             return false;
         }
     }
 
     try {
-        std::wstringstream msg(wMsg);
+        std::wstringstream wsMsg(wMsg);
         std::wstring cmd;
-        msg >> cmd;
+        wsMsg >> cmd;
 
-        return ChatInputCallbacks.at(cmd)(cmd, msg); // Find the callback, and then call it.
+        return ChatInputCallbacks.at(cmd)(cmd, wsMsg); // Find the callback, and then call it.
     }
     catch (...) {
         return true; // Ignore the exception. Command not found.

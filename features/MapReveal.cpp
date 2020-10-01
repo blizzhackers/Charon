@@ -138,8 +138,6 @@ public:
 
     void DrawPresets(D2::Types::Room2* pRoom2, D2::Types::AutomapLayer* layer) {
         for (D2::Types::PresetUnit* pUnit = pRoom2->pPreset; pUnit; pUnit = pUnit->pPresetNext) {
-            int mCell = -1;
-
             switch (pUnit->dwType) {
             case 1: // NPCs
                 switch (pUnit->dwTxtFileNo) {

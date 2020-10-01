@@ -60,7 +60,6 @@ void* __stdcall CreateTxtTableArray_Intercept(void* pMemory, char* szTableName, 
         }
     }
     else if (Settings["rebalanceDrops"] && strcmp(szTableName, "treasureclassex") == 0) {
-        int tableSize = *nTxtTableSize;
         TreasureClassExTable* treasureclassex = (TreasureClassExTable*)table;
         TreasureClassExTable* runes = treasureclassex + 25;
 

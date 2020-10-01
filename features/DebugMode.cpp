@@ -152,9 +152,9 @@ public:
             
             for (D2::Types::Room2* room = D2::PlayerUnit->pPath->pRoom1->pRoom2->pLevel->pRoom2First; room != NULL; room = room->pRoom2Next) {
                 for (D2::Types::PresetUnit* unit = room->pPreset; unit != NULL; unit = unit->pPresetNext) {
-                    DPOINT pos = { (double)room->dwPosX * 5 + (double)unit->dwPosX, (double)room->dwPosY * 5 + (double)unit->dwPosY };
-                    DrawWorldX(pos, 0x84);
-                    POINT wpos = WorldToScreen(pos);
+                    DPOINT dpos = { (double)room->dwPosX * 5 + (double)unit->dwPosX, (double)room->dwPosY * 5 + (double)unit->dwPosY };
+                    DrawWorldX(dpos, 0x84);
+                    POINT wpos = WorldToScreen(dpos);
                     swprintf_s(msg, L"%d", unit->dwTxtFileNo);
                     height = D2::GetTextSize(msg, &width, &fontNum);
                     D2::DrawGameText(msg, wpos.x - (width >> 1) - 4, wpos.y + height + 2, 2, 1);

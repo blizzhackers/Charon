@@ -36,26 +36,26 @@ void Element::setPos(int x, int y) {
     this->pos.bottom = this->pos.top + this->height;
 }
 
-void Element::setDimensions(int width, int height) {
-    this->width = width;
-    this->height = height;
+void Element::setDimensions(int newWidth, int newHeight) {
+    this->width = newWidth;
+    this->height = newHeight;
 
     this->pos.right = this->pos.left + this->width;
     this->pos.bottom = this->pos.top + this->height;
 }
 
-void Element::setFrame(int backgroundColor, int backgroundOpacity, int borderColor) {
-    this->backgroundColor = backgroundColor;
-    this->backgroundOpacity = backgroundOpacity;
-    this->borderColor = borderColor;
+void Element::setFrame(int newBackgroundColor, int newBackgroundOpacity, int newBorderColor) {
+    this->backgroundColor = newBackgroundColor;
+    this->backgroundOpacity = newBackgroundOpacity;
+    this->borderColor = newBorderColor;
 }
 
 void Element::addLine(POINT a, POINT b, int color, int opacity) {
     lines.push_back({ a, b, color, opacity });
 }
 
-void Element::getLinesCallback(std::function<std::vector<LineInfo>(std::vector<LineInfo> lines)> drawLinesCallback) {
-    this->drawLinesCallback = drawLinesCallback;
+void Element::getLinesCallback(std::function<std::vector<LineInfo>(std::vector<LineInfo> lines)> newDrawLinesCallback) {
+    this->drawLinesCallback = newDrawLinesCallback;
 }
 
 void Element::show() {
@@ -95,7 +95,7 @@ void Element::drawFrame(int ox, int oy) {
 
     if (borderColor >= 0) {
         RECT b = { ox + pos.left, oy + pos.top, ox + pos.right, oy + pos.bottom };
-        D2::DrawRect(&b, borderColor);
+        D2::DrawRect(&b, (BYTE)borderColor);
     }
 
     for (LineInfo line : (drawLinesCallback ? drawLinesCallback(lines) : lines)) {

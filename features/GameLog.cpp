@@ -45,7 +45,7 @@ std::wstring COLOR(BYTE color) {
 }
 
 void __fastcall PrintGameStringHook(const wchar_t* wMessage, int nColor) {
-    gamelog << COLOR(nColor) << wMessage << std::endl;
+    gamelog << COLOR((BYTE)nColor) << wMessage << std::endl;
 }
 
 ASMPTR GameStringInterceptExit = 0x49e3a9;

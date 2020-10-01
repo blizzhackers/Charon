@@ -14,10 +14,7 @@ DWORD SetData(DWORD pAddr, const T& value) {
 
     if (VirtualProtect((LPVOID)pAddr, dwSize, PAGE_READWRITE, &dwOld)) {
         for (DWORD i = 0; i < dwSize; i++) {
-            try {
-                BYTE tmp = OriginalBytes.at(pAddr + i);
-            }
-            catch (...) {
+            if (!OriginalBytes.count(pAddr + i)) {
                 OriginalBytes[pAddr + i] = *(BYTE*)(pAddr + i);
             }
         }
@@ -36,10 +33,7 @@ DWORD PatchCall(BYTE instruction, DWORD pAddr, DWORD pFunc) {
 
     if (VirtualProtect((LPVOID)pAddr, dwLen, PAGE_READWRITE, &dwOld)) {
         for (DWORD i = 0; i < dwLen; i++) {
-            try {
-                BYTE tmp = OriginalBytes.at(pAddr + i);
-            }
-            catch (...) {
+            if (!OriginalBytes.count(pAddr + i)) {
                 OriginalBytes[pAddr + i] = *(BYTE*)(pAddr + i);
             }
         }
@@ -59,10 +53,7 @@ DWORD PatchCallW(const BYTE instruction[2], DWORD pAddr, DWORD pFunc) {
 
     if (VirtualProtect((LPVOID)pAddr, dwLen, PAGE_READWRITE, &dwOld)) {
         for (DWORD i = 0; i < dwLen; i++) {
-            try {
-                BYTE tmp = OriginalBytes.at(pAddr + i);
-            }
-            catch (...) {
+            if (!OriginalBytes.count(pAddr + i)) {
                 OriginalBytes[pAddr + i] = *(BYTE*)(pAddr + i);
             }
         }
@@ -83,10 +74,7 @@ DWORD SetBytes(DWORD pAddr, BYTE value, DWORD dwLen) {
 
     if (dwLen > 0 && VirtualProtect((LPVOID)pAddr, dwLen, PAGE_READWRITE, &dwOld)) {
         for (DWORD i = 0; i < dwLen; i++) {
-            try {
-                BYTE tmp = OriginalBytes.at(pAddr + i);
-            }
-            catch (...) {
+            if (!OriginalBytes.count(pAddr + i)) {
                 OriginalBytes[pAddr + i] = *(BYTE*)(pAddr + i);
             }
         }
@@ -204,7 +192,7 @@ MemoryPatch& MemoryPatch::operator << (const NOP_TO address) {
         sprintf_s(msg, "Your NOP_TO is already past the target address: at 0x%08x, target 0x%08x", pAddr, address.addr);
         std::cout << msg << std::endl;
         MessageBoxA(NULL, msg, "MemoryPatch Error", MB_OK);
-        ExitProcess(-1);
+        ExitProcess((UINT)-1);
     }
     else {
         DWORD len = address.addr - pAddr;
@@ -255,10 +243,7 @@ MemoryPatch& MemoryPatch::operator << (BYTESEQ bytes) {
 
     if (dwSize > 0 && VirtualProtect((LPVOID)pAddr, dwSize, PAGE_READWRITE, &dwOld)) {
         for (DWORD i = 0; i < dwSize; i++) {
-            try {
-                BYTE tmp = OriginalBytes.at(pAddr + i);
-            }
-            catch (...) {
+            if (!OriginalBytes.count(pAddr + i)) {
                 OriginalBytes[pAddr + i] = *(BYTE*)(pAddr + i);
             }
         }

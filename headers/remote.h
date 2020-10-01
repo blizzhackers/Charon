@@ -41,6 +41,7 @@ namespace D2 {
 	GLOBALFUNC(void __stdcall, DrawDiamond, (RECT* pRect, BYTE nPaletteIndex), 0x4F6280);
 	GLOBALFUNC(void __stdcall, DrawRect, (RECT* pRect, BYTE nPaletteIndex), 0x4F62A0);
 	GLOBALFUNC(void __stdcall, DrawSolidRectAlpha, (int nXStart, int nYStart, int nXEnd, int nYEnd, DWORD dwColor, DWORD nAlpha), 0x4F6340);
+	GLOBALFUNC(void __stdcall, DrawImage, (void* pDC6Context, int nPositionX, int nPositionY, int dwGamma, DWORD eMode, void* pPalette), 0x4F6480);
 	GLOBALFUNC(DWORD __fastcall, GetTextSize, (const wchar_t* wStr, DWORD* dwWidth, DWORD* dwFileNo), 0x502520);
 	GLOBALFUNC(DWORD __stdcall, GetUnitStat, (Types::UnitAny* pUnit, DWORD dwStat, DWORD dwStat2), 0x625480);
 	GLOBALFUNC(int __stdcall, GetUnitState, (Types::UnitAny* pUnit, DWORD dwStateNo), 0x639DF0);

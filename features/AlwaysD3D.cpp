@@ -188,11 +188,11 @@ BOOL __fastcall FlipSurfaces() {
     GetClientRect(D2::hWnd, &windowrect);
     MapWindowPoints(D2::hWnd, NULL, (LPPOINT)&windowrect, 2);
 
-    long newwidth = (windowrect.bottom - windowrect.top) * InternalWidth / InternalHeight;
+    long newWidth = (windowrect.bottom - windowrect.top) * InternalWidth / InternalHeight;
     targetrect.top = windowrect.top;
     targetrect.bottom = windowrect.bottom;
-    targetrect.left = (windowrect.left + windowrect.right - newwidth) / 2;
-    targetrect.right = targetrect.left + newwidth;
+    targetrect.left = (windowrect.left + windowrect.right - newWidth) / 2;
+    targetrect.right = targetrect.left + newWidth;
 
     if (repaintsides) {
         D3DSurfacePrimary->Blt(&windowrect, D3DSurfaceBackground, NULL, DDBLT_WAIT, NULL);

@@ -234,85 +234,118 @@ std::vector<std::vector<DialogToggleInfo*>> SettingsColumns = {
     },
 };
 
-class : public Feature {
-    Element *dialog;
-public:
-    void init() {
-        int inset = 5, width = 200, height = 15, top = 28, font = 0, dialogWidth = 0, dialogHeight = top + 2 * height;
+namespace SettingsFeature {
+    Element* dialog;
 
-        for (std::vector<DialogToggleInfo*>& SettingsColumn : SettingsColumns) {
-            dialogHeight = max(dialogHeight, top + ((int)SettingsColumn.size() + 2) * height);
-            dialogWidth += width;
-        }
 
-        dialog = new Dialog();
-        dialog->setPos(-dialogWidth / 2, -dialogHeight / 2);
-        dialog->setDimensions(dialogWidth, dialogHeight);
-        // bind the enter key to the OK button
-        dialog->onKey([](DWORD keyCode, bool down, DWORD flags) -> bool {
-            return false; // Block keypresses to D2 and dialogs behind this one (windowMessage and keyEvent still work regardless)
-        });
-
-        TextElement* dlabel = new TextElement();
-        dlabel->setPos(0, 0); dlabel->setTextOffset(0, -6); dlabel->setDimensions(dialogWidth, 25); dlabel->setFrame(0x2, 0xFF, 0xD); dlabel->setFont(5); dlabel->setOrientation(Orientation::CENTER); dlabel->setText(L"Charon Settings"); dlabel->show(); dialog->addChild(dlabel);
-
-        Element* close = new Element();
-        int xsize = 13, xinset = 6;
-        close->setPos(dialogWidth - xinset - xsize, xinset); close->setDimensions(xsize, xsize); close->setFrame(0, 0xFF, 0xD); close->show(); dialog->addChild(close);
-        close->addLine({ 0, 0 }, { xsize, xsize }, 0xD);
-        close->addLine({ 0, xsize }, { xsize, 0 }, 0xD);
-        close->getLinesCallback([&](std::vector<LineInfo> lines) -> std::vector<LineInfo> {
-            // Example callback; Since 'lines' contains all the data from addLine,
-            // we can modify it or return a completely new vector here.
-            return lines;
-        });
-
-        close->onClick([&](MouseButton button, bool down) -> void {
-            dialog->hide();
-        });
-
-        TextElement* caption = new TextElement();
-        caption->setPos(0, dialogHeight - height); caption->setDimensions(400, height); caption->setTextOffset(0, -4); caption->setFont(font); caption->setText(L"\u00FFc3*\u00FFc4Requires New Game, \u00FFc;*\u00FFc4Requires Restart"); caption->setOrientation(Orientation::CENTER); caption->show(); dialog->addChild(caption);
-
-        int x = inset, y;
-
-        for (std::vector<DialogToggleInfo*>& SettingsColumn : SettingsColumns) {
-            y = top;
-            for (DialogToggleInfo* setting : SettingsColumn) {
-                if (setting != nullptr) {
-                    TextElement* elem;
-                    Element* group = new Element();
-                    group->setPos(x, y); group->setDimensions(width - inset * 2, height); group->show(); dialog->addChild(group);
-                    elem = new TextElement(); elem->setTextOffset(0, -4); elem->setDimensions(width - inset * 2, height); elem->setFont(font); elem->setText(setting->label); elem->show(); group->addChild(elem);
-                    elem = new TextElement(); elem->setTextOffset(0, -4); elem->setDimensions(width - inset * 2, height); elem->setFont(font); elem->setOrientation(Orientation::RIGHT); elem->show(); group->addChild(elem);
-                    elem->setText(setting->valuecallback);
-                    group->onClick(setting->clickhandler);
-                }
-                y += height;
-            }
-            x += width;
-        }
-
-        D2::NoPickUp = Settings["noPickup"];
+    const static int __fastcall isVisibleWrapper() {
+        return dialog->isVisible();
     }
 
-    bool keyEvent(DWORD keyCode, bool down, DWORD flags) {
-        switch (keyCode) {
-        case VK_ESCAPE:
-            if (dialog->isVisible()) {
-                if (down) {
-                    dialog->hide();
-                    return false;
-                }
-            }
+    int __declspec(naked) pauseGameIntercept() {    
+        const static ASMPTR GetUiFlagWrapper = 0x453a90;
+        const static ASMPTR Continue = 0x44efed;
+        const static ASMPTR PauseGame = 0x44f00a;
+        __asm {
+                
+                
+                CALL isVisibleWrapper 
+                CMP EAX, 1    
+                JNE original
+                JMP PauseGame
 
-            break;
-        case VK_F11:
-            dialog->setVisibile(!dialog->isVisible());
-            return false;
+            original:
+                // Original code
+                MOV     ECX, 0x9
+                CALL    GetUiFlagWrapper    // eax = GetUiFlagWrapper(9)
+                JMP     Continue;
+
+
         }
-
-        return true;
     }
 
-} feature;
+    class : public Feature {
+    public:
+        void init() {
+            int inset = 5, width = 200, height = 15, top = 28, font = 0, dialogWidth = 0, dialogHeight = top + 2 * height;
+
+            for (std::vector<DialogToggleInfo*>& SettingsColumn : SettingsColumns) {
+                dialogHeight = max(dialogHeight, top + ((int)SettingsColumn.size() + 2) * height);
+                dialogWidth += width;
+            }
+
+            dialog = new Dialog();
+            dialog->setPos(-dialogWidth / 2, -dialogHeight / 2);
+            dialog->setDimensions(dialogWidth, dialogHeight);
+            // bind the enter key to the OK button
+            dialog->onKey([](DWORD keyCode, bool down, DWORD flags) -> bool {
+                return false; // Block keypresses to D2 and dialogs behind this one (windowMessage and keyEvent still work regardless)
+            });
+
+            TextElement* dlabel = new TextElement();
+            dlabel->setPos(0, 0); dlabel->setTextOffset(0, -6); dlabel->setDimensions(dialogWidth, 25); dlabel->setFrame(0x2, 0xFF, 0xD); dlabel->setFont(5); dlabel->setOrientation(Orientation::CENTER); dlabel->setText(L"Charon Settings"); dlabel->show(); dialog->addChild(dlabel);
+
+            Element* close = new Element();
+            int xsize = 13, xinset = 6;
+            close->setPos(dialogWidth - xinset - xsize, xinset); close->setDimensions(xsize, xsize); close->setFrame(0, 0xFF, 0xD); close->show(); dialog->addChild(close);
+            close->addLine({ 0, 0 }, { xsize, xsize }, 0xD);
+            close->addLine({ 0, xsize }, { xsize, 0 }, 0xD);
+            close->getLinesCallback([&](std::vector<LineInfo> lines) -> std::vector<LineInfo> {
+                // Example callback; Since 'lines' contains all the data from addLine,
+                // we can modify it or return a completely new vector here.
+                return lines;
+                });
+
+            close->onClick([&](MouseButton button, bool down) -> void {
+                dialog->hide();
+                });
+
+            TextElement* caption = new TextElement();
+            caption->setPos(0, dialogHeight - height); caption->setDimensions(400, height); caption->setTextOffset(0, -4); caption->setFont(font); caption->setText(L"\u00FFc3*\u00FFc4Requires New Game, \u00FFc;*\u00FFc4Requires Restart"); caption->setOrientation(Orientation::CENTER); caption->show(); dialog->addChild(caption);
+
+            int x = inset, y;
+
+            for (std::vector<DialogToggleInfo*>& SettingsColumn : SettingsColumns) {
+                y = top;
+                for (DialogToggleInfo* setting : SettingsColumn) {
+                    if (setting != nullptr) {
+                        TextElement* elem;
+                        Element* group = new Element();
+                        group->setPos(x, y); group->setDimensions(width - inset * 2, height); group->show(); dialog->addChild(group);
+                        elem = new TextElement(); elem->setTextOffset(0, -4); elem->setDimensions(width - inset * 2, height); elem->setFont(font); elem->setText(setting->label); elem->show(); group->addChild(elem);
+                        elem = new TextElement(); elem->setTextOffset(0, -4); elem->setDimensions(width - inset * 2, height); elem->setFont(font); elem->setOrientation(Orientation::RIGHT); elem->show(); group->addChild(elem);
+                        elem->setText(setting->valuecallback);
+                        group->onClick(setting->clickhandler);
+                    }
+                    y += height;
+                }
+                x += width;
+            }
+
+            D2::NoPickUp = Settings["noPickup"];
+
+            // Pause the game like with the normal esc menu
+            MemoryPatch(0x44efe3) << JUMP(pauseGameIntercept);
+        }
+
+        bool keyEvent(DWORD keyCode, bool down, DWORD flags) {
+            switch (keyCode) {
+            case VK_ESCAPE:
+                if (dialog->isVisible()) {
+                    if (down) {
+                        dialog->hide();
+                        return false;
+                    }
+                }
+
+                break;
+            case VK_F11:
+                dialog->setVisibile(!dialog->isVisible());
+                return false;
+            }
+
+            return true;
+        }
+
+    } feature;
+}
