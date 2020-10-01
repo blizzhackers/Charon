@@ -211,6 +211,35 @@ bool isEnemy(D2::Types::UnitAny* unit) {
     return unitHP(unit) > 0 && isHostile(unit) && isAttackable(unit);
 }
 
+std::list<D2::Types::UnitAny*> getUnits(int type) {
+
+    D2::Types::UnitHashTable* lookupTables = D2::ServerSideUnitHashTables;
+    D2::Types::UnitAny* unit;
+
+    switch (type) {
+    case 0:
+    case 1:
+    case 2:
+    case 4:
+    case 5:
+        break;
+    case 3:
+        lookupTables = D2::ClientSideUnitHashTables;
+        break;
+    default:
+        throw "Type needs to be between 0 and 5";
+    }
+    std::list<D2::Types::UnitAny*> list;
+    for (int c = 0; c < 128; c++) {
+        for (unit = lookupTables[type].table[c]; unit; unit = unit->pListNext) {
+            if (unit->dwType == type) {
+                list.push_back(unit);
+            }
+        }
+    }
+    return list;
+}
+
 namespace D2 {
     namespace Types {
         WORD CollMap::getCollision(DWORD localx, DWORD localy, WORD mask) {

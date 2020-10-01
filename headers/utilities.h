@@ -36,3 +36,4 @@ bool isFriendly(D2::Types::UnitAny* unit);
 bool isHostile(D2::Types::UnitAny* unit);
 bool isAttackable(D2::Types::UnitAny* unit);
 bool isEnemy(D2::Types::UnitAny* unit);
+std::list<D2::Types::UnitAny*> getUnits(int type);
