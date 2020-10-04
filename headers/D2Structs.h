@@ -14,13 +14,68 @@
 typedef void(*VOIDFUNC)();
 
 namespace D2 {
-    enum UnitType : int {
+    enum class UnitType : DWORD {
         UNIT_PLAYER = 0,
         UNIT_MONSTER = 1,
         UNIT_OBJECT = 2,
         UNIT_MISSILE = 3,
         UNIT_ITEM = 4,
         UNIT_ROOMTILE = 5,
+    };
+
+    enum class ItemQuality : DWORD {
+        LOW = 1,
+        NORMAL = 2,
+        SUPERIOR = 3,
+        MAGIC = 4,
+        SET = 5,
+        RARE = 6,
+        UNIQUE = 7,
+        CRAFTED = 8,
+    };
+
+    enum class QuestId : DWORD {
+        SPOKE_TO_WARRIV = 0,
+        DEN_OF_EVIL = 1,
+        SISTERS_BURIAL_GROUNDS = 2,
+        TOOLS_OF_THE_TRADE = 3,
+        SEARCH_FOR_CAIN = 4,
+        FORGOTTEN_TOWER = 5,
+        KILL_ANDARIEL = 6,
+        ACT_2_UNLOCK = 7,
+        SPOKE_TO_JERHYN = 8,
+        RADAMANTS_LAIR = 9,
+        HORADRIC_STAFF = 10,
+        TAINTED_SUN = 11,
+        ARCANE_SANCTUARY = 12,
+        SUMMONER = 13,
+        KILL_DURIEL = 14,
+        ACT_3_UNLOCK = 15,
+        SPOKE_TO_HRATLI = 16,
+        LAM_ESENS_TOME = 17,
+        KHALIMS_WILL = 18,
+        BLADE_OF_OLD_RELIGION = 19,
+        GOLDEN_BIRD = 20,
+        BLACKENED_TEMPLE = 21,
+        KILL_MEPHISTO = 22,
+        ACT_4_UNLOCK = 23,
+        SPOKE_TO_TYRAEL = 24,
+        FALLEN_ANGEL = 25,
+        KILL_DIABLO = 26,
+        HELL_FORGE = 27,
+        ACT_5_UNLOCK = 28,
+        RESPEC = 29,
+        UNKNOWN1 = 30,
+        UNKNOWN2 = 31,
+        UNKNOWN3 = 32,
+        UNKNOWN4 = 33,
+        UNKNOWN5 = 34,
+        SEIGE_ON_HAGGORATH = 35,
+        RESCUE_ON_MOUNT_ARREAT = 36,
+        PRISON_OF_ICE = 37,
+        BETRAYAL_OF_HAGGORATH = 38,
+        RITE_OF_PASSAGE = 39,
+        KILL_BAAL = 40,
     };
 
     namespace Types {
@@ -550,20 +605,206 @@ namespace D2 {
         };
 
         struct ItemTxt {
-            wchar_t szName2[0x40]; // 0x00
+            char szFlippyFile[32];
+            char szInvFile[32];
+            char szUniqueInvFile[32];
+            char szSetInvFile[32];
+            char szCode[4];
+            int dwNormCode;
+            int dwUberCode;
+            int dwUltraCode;
+            int dwAlternateGfx;
+            int dwPSpell;
+            short wState;
+            short wCState1;
+            short wCState2;
+            short wStat1;
+            short wStat2;
+            short wStat3;
+            int dwCalc1;
+            int dwCalc2;
+            int dwCalc3;
+            int dwLen;
+            short wSpellDesc;
+            short wSpellDescStr;
+            int dwSpellDescCalc;
+            int dwBetterGem;
+            int dwWClass;
+            int dw2HandedWClass;
+            int dwTMogType;
+            int dwMinAc;
+            int dwMaxAc;
+            int dwGambleCost;
+            int dwSpeed;
+            int dwBitfield1;
+            int dwCost;
+            int dwMinStack;
+            int dwMaxStack;
+            int dwSpawnStack;
+            int dwGemOffset;
+            short wNameStr;
+            short wVersion;
+            short wAutoPrefix;
+            short wMissileType;
+            char bRarity;
+            char bLevel;
+            char bMinDam;
+            char bMaxDam;
+            char bMinMisDam;
+            char bMaxMisDam;
+            char b2HandMinDam;
+            char b2HandMaxDam;
+            short bRangeAdder;
+            short wStrBonus;
+            short wDexBonus;
+            short wReqStr;
+            short wReqDex;
+            char bAbsorbs;
+            char bInvWidth;
+            char bInvHeight;
+            char bBlock;
+            char bDurability;
+            char bNoDurability;
+            char bMissile;
+            char bComponent;
+            char bRArm;
+            char bLArm;
+            char bTorso;
+            char bLegs;
+            char bRSPad;
+            char bLSPad;
+            char b2Handed;
+            char bUseable;
             union {
-                DWORD dwCode;
-                char szCode[4];
-            };                 // 0x40
-            BYTE _2[0x70];     // 0x84
-            WORD nLocaleTxtNo; // 0xF4
-            BYTE _2a[0x19];    // 0xF7
-            BYTE xSize;        // 0xFC
-            BYTE ySize;        // 0xFD
-            BYTE _2b[13];      // 0xFE
-            BYTE nType;        // 0x11E
-            BYTE _3[0x0d];     // 0x11F
-            BYTE fQuest;       // 0x12A
+                short wType;
+                short nType;
+            };
+            short wType2;
+            short bSubType;
+            short wDropSound;
+            short wUseSound;
+            char bDropSfxFrame;
+            char bUnique;
+            char bQuest;
+            char bQuestDiffCheck;
+            char bTransparent;
+            char bTransTbl;
+            char pad0x12E;
+            char bLightRadius;
+            char bBelt;
+            char bAutoBelt;
+            char bStackable;
+            char bSpawnable;
+            char bSpellIcon;
+            char bDurWarning;
+            char bQntWarning;
+            char bHasInv;
+            char bGemSockets;
+            char bTransmogrify;
+            char bTMogMin;
+            char bTMogMax;
+            char bHitClass;
+            char b1or2Handed;
+            char bGemApplyType;
+            char bLevelReq;
+            char bMagicLvl;
+            char bTransform;
+            char bInvTrans;
+            char bCompactSave;
+            char bSkipName;
+            char bNameable;
+            char bAkaraMin;
+            char bGheedMin;
+            char bCharsiMin;
+            char bFaraMin;
+            char bLysanderMin;
+            char bDrognanMin;
+            char bHraltiMin;
+            char bAlkorMin;
+            char bOrmusMin;
+            char bElzixMin;
+            char bAshearaMin;
+            char bCainMin;
+            char bHalbuMin;
+            char bJamellaMin;
+            char bMalahMin;
+            char bLarzukMin;
+            char bDrehyaMin;
+            char bAkaraMax;
+            char bGheedMax;
+            char bCharsiMax;
+            char bFaraMax;
+            char bLysanderMax;
+            char bDrognanMax;
+            char bHraltiMax;
+            char bAlkorMax;
+            char bOrmusMax;
+            char bElzixMax;
+            char bAshearaMax;
+            char bCainMax;
+            char bHalbuMax;
+            char bJamellaMax;
+            char bMalahMax;
+            char bLarzukMax;
+            char bDrehyaMax;
+            char bAkaraMagicMin;
+            char bGheedMagicMin;
+            char bCharsiMagicMin;
+            char bFaraMagicMin;
+            char bLysanderMagicMin;
+            char bDrognanMagicMin;
+            char bHraltiMagicMin;
+            char bAlkorMagicMin;
+            char bOrmusMagicMin;
+            char bElzixMagicMin;
+            char bAshearaMagicMin;
+            char bCainMagicMin;
+            char bHalbuMagicMin;
+            char bJamellaMagicMin;
+            char bMalahMagicMin;
+            char bLarzukMagicMin;
+            char bDrehyaMagicMin;
+            char bAkaraMagicMax;
+            char bGheedMagicMax;
+            char bCharsiMagicMax;
+            char bFaraMagicMax;
+            char bLysanderMagicMax;
+            char bDrognanMagicMax;
+            char bHraltiMagicMax;
+            char bAlkorMagicMax;
+            char bOrmusMagicMax;
+            char bElzixMagicMax;
+            char bAshearaMagicMax;
+            char bCainMagicMax;
+            char bHalbuMagicMax;
+            char bJamellaMagicMax;
+            char bMalahMagicMax;
+            char bLarzukMagicMax;
+            char bDrehyaMagicMax;
+            char bAkaraMagicLvl;
+            char bGheedMagicLvl;
+            char bCharsiMagicLvl;
+            char bFaraMagicLvl;
+            char bLysanderMagicLvl;
+            char bDrognanMagicLvl;
+            char bHraltiMagicLvl;
+            char bAlkorMagicLvl;
+            char bOrmusMagicLvl;
+            char bElzixMagicLvl;
+            char bAshearaMagicLvl;
+            char bCainMagicLvl;
+            char bHalbuMagicLvl;
+            char bJamellaMagicLvl;
+            char bMalahMagicLvl;
+            char bLarzukMagicLvl;
+            char bDrehyaMagicLvl;
+            char pad0x19B;
+            int dwNightmareUpgrade;
+            int dwHellUpgrade;
+            char bPermStoreItem;
+            char bMultibuy;
+            BYTE field_0x1a6;
+            BYTE field_0x1a7;
         };
 
         struct MonsterTxt {
@@ -660,21 +901,26 @@ namespace D2 {
             };               // 0x14
             DWORD dwAct;     // 0x18
             Act* pAct;       // 0x1C
-            DWORD dwSeed[2]; // 0x20
-            DWORD _2;        // 0x28
+            DWORD dwLoSeed;  // 0x20
+            DWORD dwHiSeed;  // 0x24
+            DWORD dwInitSeed;         // 0x28
             union {
                 Path* pPath;
                 ItemPath* pItemPath;
                 ObjectPath* pObjectPath;
             };                        // 0x2C
-            DWORD _3[5];              // 0x30
+            BYTE* pAnimSeq;           // 0x30
+            DWORD dwSeqFrameCount;    // 0x34
+            DWORD dwSeqFrame;         // 0x38
+            DWORD dwAnimSpeed;        // 0x3C
+            DWORD dwSeqMode;          // 0x40
             DWORD dwGfxFrame;         // 0x44
             DWORD dwFrameRemain;      // 0x48
             WORD wFrameRate;          // 0x4C
-            WORD _4;                  // 0x4E
+            WORD wActionFrame;        // 0x4E
             BYTE* pGfxUnk;            // 0x50
             DWORD* pGfxInfo;          // 0x54
-            DWORD _5;                 // 0x58
+            DWORD* pGfxInfoCopy;      // 0x58
             StatList* pStats;         // 0x5C
             Inventory* pInventory;    // 0x60
             Light* ptLight;           // 0x64
@@ -695,13 +941,23 @@ namespace D2 {
             DWORD _8[2];              // 0x9C
             OverheadMsg* pOMsg;       // 0xA4
             Info* pInfo;              // 0xA8
-            DWORD _9[6];              // 0xAC
+            void *pCombat;            // 0xAC
+            DWORD dwLastHitClass;     // 0xB0
+            DWORD unk0xB4;            // 0xB4
+            union {
+                char sDropItemCode[4];
+                DWORD dwDropItemCode;
+            };                        // 0xB8
+            DWORD unk0xBC;            // 0xBC
+            DWORD unk0xC0;            // 0xC0
             DWORD dwFlags;            // 0xC4
             DWORD dwFlags2;           // 0xC8
             DWORD _10[5];             // 0xCC
             UnitAny* pChangedNext;    // 0xE0
-            UnitAny* pListNext;       // 0xE4 -> 0xD8
+            UnitAny* pListNext;       // 0xE4
             UnitAny* pRoomNext;       // 0xE8
+            void* pMsgFirst;          // 0xEC
+            void* pMsgLast;           // 0xF0
         };
 
         struct UnitHashTable {
