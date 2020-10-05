@@ -122,13 +122,15 @@ REMOTEFUNC(D2::Types::UnitAny* __fastcall, SpawnItemWithStruct, (IncompleteGameD
 REMOTEFUNC(D2::Types::Room1* __fastcall, FindBestSpotToSpawnItem, (D2::Types::Room1* pDrlgRoom, POINT* pUnitPosition, POINT* pNewPosition, WORD param_2_00, BYTE param_5), 0x555DA0);
 REMOTEFUNC(DWORD __stdcall, GetItemClassIdByCode, (DWORD dwItemCode), 0x633680);
 REMOTEFUNC(void __fastcall, PlaySoundMaybe, (D2::Types::UnitAny* pUnit, short nUpdateType, D2::Types::UnitAny* pUpdateUnit), 0x553380);
-REMOTEFUNC(void __fastcall, MephAI, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, int* param_1_00), 0x5E9170);
-REMOTEFUNC(void __fastcall, DiabloAI, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, int* param_1_00), 0x5F78B0);
-REMOTEFUNC(void __fastcall, BaalAI, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, int* param_1_00), 0x5FCFE0);
+
+REMOTEFUNC(void __fastcall, MephAI, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, void* pAiParams), 0x5F78B0);
+REMOTEFUNC(void __fastcall, DiabloAI, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, void* pAiParams), 0x5E9170);
+REMOTEFUNC(void __fastcall, BaalAI, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, void* pAiParams), 0x5FCFE0);
 
 ASMPTR UberBaalAIPointer = 0x73D330, UberBaalAI = 0x5FD200;
 ASMPTR UberMephAIPointer = 0x73D340, UberMephAI = 0x5F81C0;
 ASMPTR UberDiabloAIPointer = 0x73D350, UberDiabloAI = 0x05E9DF0;
+
 ASMPTR CowsCubeOutputHook = 0x565a80, CubeKeysHook = 0x565a90, CubeOrgansHook = 0x565aa0;
 ASMPTR RoomInit_Original = 0x542b40, RoomInit_Rejoin = 0x542b46;
 ASMPTR KillMonster_Original = 0x57CCB0, KillMonster_Rejoin = 0x57CCB6;
@@ -143,6 +145,9 @@ std::vector<const char*> keyCodes = {
     "pk1 ",
     "pk2 ",
     "pk3 ",
+    "dhn ",
+    "bey ",
+    "mbr ",
 };
 
 DWORD GetActFromRoom(D2::Types::Room1* a) {
@@ -342,7 +347,7 @@ void __fastcall KillMonster_Hook(IncompleteGameData* pGame, D2::Types::UnitAny* 
         gameFlags[pGame->seed].flags.uberBaalKilled = true;
         break;
     default:
-        if (rand() % 6 == 0) {
+        if (rand() % 2 == 0) {
             SpawnItem(pGame, pVictim, randomElement(keyCodes), 90, D2::ItemQuality::NORMAL);
         }
         break;
@@ -356,16 +361,16 @@ void __fastcall KillMonster_Hook(IncompleteGameData* pGame, D2::Types::UnitAny* 
     }
 }
 
-void __fastcall UberMephAIReplacement(IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, int* param_1_00) {
-    MephAI(pGame, pUnit, param_1_00);
+void __fastcall UberMephAIReplacement(IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, void* pAiParams) {
+    MephAI(pGame, pUnit, pAiParams);
 }
 
-void __fastcall UberDiabloAIReplacement(IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, int* param_1_00) {
-    DiabloAI(pGame, pUnit, param_1_00);
+void __fastcall UberDiabloAIReplacement(IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, void* pAiParams) {
+    DiabloAI(pGame, pUnit, pAiParams);
 }
 
-void __fastcall UberBaalAIReplacement(IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, int* param_1_00) {
-    BaalAI(pGame, pUnit, param_1_00);
+void __fastcall UberBaalAIReplacement(IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, void* pAiParams) {
+    BaalAI(pGame, pUnit, pAiParams);
 }
 
 namespace Ubers {
