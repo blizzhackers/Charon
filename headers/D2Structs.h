@@ -1198,6 +1198,18 @@ namespace D2 {
             long prob[10];
         };
 
+        struct AIParams {
+            void* pMonsterAiGeneral;
+            void* fpAiFunction;
+            UnitAny* pTarget;
+            int field_0xc;
+            int field_0x10;
+            int nDistanceToTarget;
+            BOOL bEngagedInCombat;
+            MonsterTxt* pMonStats;
+            void* pMonStats2;
+        };
+
         enum class BINFieldType : int {
             FIELDTYPE_END = 0,
             FIELDTYPE_DATA_ASCII = 1,
