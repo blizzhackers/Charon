@@ -6,6 +6,7 @@
 #include "headers/remote.h"
 #include <unordered_map>
 #include <random>
+#include <cmath>
 
 #pragma pack(push)
 #pragma pack(1)
@@ -123,9 +124,9 @@ REMOTEFUNC(D2::Types::Room1* __fastcall, FindBestSpotToSpawnItem, (D2::Types::Ro
 REMOTEFUNC(DWORD __stdcall, GetItemClassIdByCode, (DWORD dwItemCode), 0x633680);
 REMOTEFUNC(void __fastcall, PlaySoundMaybe, (D2::Types::UnitAny* pUnit, short nUpdateType, D2::Types::UnitAny* pUpdateUnit), 0x553380);
 
-REMOTEFUNC(void __fastcall, MephAI, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, void* pAiParams), 0x5F78B0);
-REMOTEFUNC(void __fastcall, DiabloAI, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, void* pAiParams), 0x5E9170);
-REMOTEFUNC(void __fastcall, BaalAI, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, void* pAiParams), 0x5FCFE0);
+REMOTEFUNC(void __fastcall, MephAI, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, D2::Types::AIParams* pAiParams), 0x5F78B0);
+REMOTEFUNC(void __fastcall, DiabloAI, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, D2::Types::AIParams* pAiParams), 0x5E9170);
+REMOTEFUNC(void __fastcall, BaalAI, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, D2::Types::AIParams* pAiParams), 0x5FCFE0);
 
 ASMPTR UberBaalAIPointer = 0x73D330, UberBaalAI = 0x5FD200;
 ASMPTR UberMephAIPointer = 0x73D340, UberMephAI = 0x5F81C0;
@@ -176,6 +177,9 @@ T randomElement(std::vector<T> v) {
     return v[distr(gen)];
 }
 
+// Toggle for debug
+const bool KEY_ORGAN_DEBUG = true;
+
 BOOL __fastcall CubeKeys_Intercept(IncompleteGameData* pGame, D2::Types::UnitAny* pUnit) {
     if (pGame->nDifficulty != 2) return PlaySoundMaybe(pUnit, 0x14, pUnit), 0;
     std::vector<int> p;
@@ -196,13 +200,13 @@ BOOL __fastcall CubeKeys_Intercept(IncompleteGameData* pGame, D2::Types::UnitAny
             switch (levelTarget) {
             case 133:
                 gameFlags[pGame->seed].flags.denPortal = true;
-                return 1;
+                return !KEY_ORGAN_DEBUG;
             case 134:
                 gameFlags[pGame->seed].flags.sandsPortal = true;
-                return 1;
+                return !KEY_ORGAN_DEBUG;
             case 135:
                 gameFlags[pGame->seed].flags.furnacePortal = true;
-                return 1;
+                return !KEY_ORGAN_DEBUG;
             }
         }
     }
@@ -215,7 +219,7 @@ BOOL __fastcall CubeOrgans_Intercept(IncompleteGameData* pGame, D2::Types::UnitA
 
     if (PortalTo(pGame, pUnit, 136)) {
         gameFlags[pGame->seed].flags.tristramPortal = true;
-        return 1;
+        return !KEY_ORGAN_DEBUG;
     }
 
     return PlaySoundMaybe(pUnit, 0x14, pUnit), 0;
@@ -336,21 +340,24 @@ D2::Types::UnitAny* SpawnItem(IncompleteGameData* pGame, D2::Types::UnitAny* pVi
 void __fastcall KillMonster_Hook(IncompleteGameData* pGame, D2::Types::UnitAny* pVictim, D2::Types::UnitAny* pAttacker, BOOL bRemoveFromOwner) {
     KillMonster_Relocated(pGame, pVictim, pAttacker, bRemoveFromOwner);
 
-    switch (pVictim->dwTxtFileNo) {
-    case 704:
-        gameFlags[pGame->seed].flags.uberMephKilled = true;
-        break;
-    case 705:
-        gameFlags[pGame->seed].flags.uberDiabloKilled = true;
-        break;
-    case 709:
-        gameFlags[pGame->seed].flags.uberBaalKilled = true;
-        break;
-    default:
-        if (rand() % 2 == 0) {
-            SpawnItem(pGame, pVictim, randomElement(keyCodes), 90, D2::ItemQuality::NORMAL);
+    if (pVictim->pPath->pRoom1->pRoom2->pLevel->dwLevelNo == 136) {
+        switch (pVictim->dwTxtFileNo) {
+        case 704:
+            gameFlags[pGame->seed].flags.uberMephKilled = true;
+            break;
+        case 705:
+            gameFlags[pGame->seed].flags.uberDiabloKilled = true;
+            break;
+        case 709:
+            gameFlags[pGame->seed].flags.uberBaalKilled = true;
+            break;
         }
-        break;
+    }
+    else if (pVictim->dwTxtFileNo == 705) { // Diablo clone drops anni :)
+        SpawnItem(pGame, pVictim, "cm1 ", 90, D2::ItemQuality::UNIQUE, 381);
+    }
+    else if (KEY_ORGAN_DEBUG && rand() % 2 == 0) {
+        SpawnItem(pGame, pVictim, randomElement(keyCodes), 90, D2::ItemQuality::NORMAL);
     }
 
     if (gameFlags[pGame->seed].flags.uberMephKilled && gameFlags[pGame->seed].flags.uberDiabloKilled && gameFlags[pGame->seed].flags.uberBaalKilled && !gameFlags[pGame->seed].flags.torchDropped) {
@@ -361,15 +368,44 @@ void __fastcall KillMonster_Hook(IncompleteGameData* pGame, D2::Types::UnitAny* 
     }
 }
 
-void __fastcall UberMephAIReplacement(IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, void* pAiParams) {
+const char minionMods[9] = { 0 };
+
+void __fastcall UberMephAIReplacement(IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, D2::Types::AIParams* pAiParams) {
+    // @TODO: Spawn rates are aggressive, needs tweaking
+    const std::vector<DWORD> ids = { 725, 726, 727, 728, 729, 730 }, chances = { 0, 0, 0, 1, 2, 3 };
+    D2::Types::UnitAny* pTarget = pAiParams->pTarget;
+    int c = randomElement(chances);
+
+    while (c--) {
+        SpawnMonster(pGame, pTarget->pPath->pRoom1, pTarget->pPath->xPos, pTarget->pPath->yPos, randomElement(ids), guid++, rand(), false, false, 0, minionMods);
+    }
+
     MephAI(pGame, pUnit, pAiParams);
 }
 
-void __fastcall UberDiabloAIReplacement(IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, void* pAiParams) {
+void __fastcall UberDiabloAIReplacement(IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, D2::Types::AIParams* pAiParams) {
+    // @TODO: Spawn rates are aggressive, needs tweaking
+    const std::vector<DWORD> chances = { 0, 0, 0, 1 };
+    D2::Types::UnitAny* pTarget = pAiParams->pTarget;
+    int c = randomElement(chances);
+
+    while (c--) {
+        SpawnMonster(pGame, pTarget->pPath->pRoom1, pTarget->pPath->xPos, pTarget->pPath->yPos, 711, guid++, rand(), false, false, 0, minionMods);
+    }
+
     DiabloAI(pGame, pUnit, pAiParams);
 }
 
-void __fastcall UberBaalAIReplacement(IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, void* pAiParams) {
+void __fastcall UberBaalAIReplacement(IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, D2::Types::AIParams* pAiParams) {
+    // @TODO: Spawn rates are aggressive, needs tweaking
+    const std::vector<DWORD> ids = { 731, 732 }, chances = { 0, 0, 0, 1, 2, 3 };
+    D2::Types::UnitAny* pTarget = pAiParams->pTarget;
+    int c = randomElement(chances);
+
+    while (c--) {
+        SpawnMonster(pGame, pTarget->pPath->pRoom1, pTarget->pPath->xPos, pTarget->pPath->yPos, randomElement(ids), guid++, rand(), false, false, 0, minionMods);
+    }
+
     BaalAI(pGame, pUnit, pAiParams);
 }
 
