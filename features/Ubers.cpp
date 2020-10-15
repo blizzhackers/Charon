@@ -178,7 +178,7 @@ T randomElement(std::vector<T> v) {
 }
 
 // Toggle for debug
-const bool KEY_ORGAN_DEBUG = true;
+const bool KEY_ORGAN_DEBUG = false;
 
 BOOL __fastcall CubeKeys_Intercept(IncompleteGameData* pGame, D2::Types::UnitAny* pUnit) {
     if (pGame->nDifficulty != 2) return PlaySoundMaybe(pUnit, 0x14, pUnit), 0;
@@ -356,7 +356,7 @@ void __fastcall KillMonster_Hook(IncompleteGameData* pGame, D2::Types::UnitAny* 
     else if (pVictim->dwTxtFileNo == 705) { // Diablo clone drops anni :)
         SpawnItem(pGame, pVictim, "cm1 ", 90, D2::ItemQuality::UNIQUE, 381);
     }
-    else if (KEY_ORGAN_DEBUG && rand() % 2 == 0) {
+    else if constexpr (KEY_ORGAN_DEBUG && rand() % 2 == 0) {
         SpawnItem(pGame, pVictim, randomElement(keyCodes), 90, D2::ItemQuality::NORMAL);
     }
 
