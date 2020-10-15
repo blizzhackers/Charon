@@ -112,6 +112,7 @@ public:
         if (Settings["debugMode"]) {
             wchar_t msg[512];
             DWORD fontNum = 12, width = 0, height = 0;
+            POINT pos;
             D2::SetFont(fontNum);
 
             // Server side tracks enemies
@@ -127,7 +128,6 @@ public:
                 }
             }, D2::ServerSideUnitHashTables);
 
-            POINT pos;
             // Client side tracks missiles
             forUnits(3, [&](D2::Types::UnitAny* unit) -> void {
                 pos = WorldToScreen(unit->pPath);
