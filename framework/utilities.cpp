@@ -211,11 +211,23 @@ bool isEnemy(D2::Types::UnitAny* unit) {
     return unitHP(unit) > 0 && isHostile(unit) && isAttackable(unit);
 }
 
-std::vector<D2::Types::UnitAny*> getUnits(int type) {
-
-    D2::Types::UnitHashTable* lookupTables = D2::ServerSideUnitHashTables;
+std::vector<D2::Types::UnitAny*> getUnits(int type, D2::Types::UnitHashTable* lookupTables) {
+    if (type < 0 || type > 5) {
+        throw "Type needs to be between 0 and 5";
+    }
     D2::Types::UnitAny* unit;
 
+    std::vector<D2::Types::UnitAny*> vector;
+    for (int c = 0; c < 128; c++) {
+        for (unit = lookupTables[type].table[c]; unit; unit = unit->pListNext) {
+            vector.push_back(unit);
+        }
+    }
+
+    return vector;
+}
+std::vector<D2::Types::UnitAny*> getUnits(int type) {
+    D2::Types::UnitHashTable* lookupTables = D2::ServerSideUnitHashTables;
     switch (type) {
     case 0:
     case 1:
@@ -229,15 +241,7 @@ std::vector<D2::Types::UnitAny*> getUnits(int type) {
     default:
         throw "Type needs to be between 0 and 5";
     }
-    std::vector<D2::Types::UnitAny*> vector;
-    for (int c = 0; c < 128; c++) {
-        for (unit = lookupTables[type].table[c]; unit; unit = unit->pListNext) {
-            if (unit->dwType == type) {
-                vector.push_back(unit);
-            }
-        }
-    }
-    return vector;
+    return getUnits(type, lookupTables);
 }
 
 namespace D2 {
