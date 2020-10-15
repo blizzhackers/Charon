@@ -11,7 +11,9 @@ void __fastcall NET_SID_CLIENT_IncomingPacketHandler_Replacement(BYTE nPacketId,
 {
     NET_SID_CLIENT_IncomingPacketHandler(nPacketId, pBytes, nSize);
 
-    gamelog << COLOR(2) << "SID " << COLOR(4) << "(SERVER -> CLIENT)" << COLOR(0) << " 0x" << std::hex << nPacketId << std::dec << " size of " << nSize << std::endl;
+    if (Settings["debugPackets"]) {
+        gamelog << COLOR(2) << "SID " << COLOR(4) << "(SERVER -> CLIENT)" << COLOR(0) << " 0x" << std::hex << nPacketId << std::dec << " size of " << nSize << std::endl;
+    }
 }
 
 // SID (CLIENT -> SERVER)
@@ -30,17 +32,18 @@ void __fastcall NET_SID_CLIENT_Send_Hook(INT nPacketId, BYTE* pBytes, size_t nSi
 {
     NET_SID_CLIENT_Send_Relocated(nPacketId, pBytes, nSizeNoHeader);
 
-    void** puEBP = NULL;
-    __asm { mov puEBP, ebp };
-    void* pvReturn = puEBP[1];
+    if (Settings["debugPackets"]) {
+        void** puEBP = NULL;
+        __asm { mov puEBP, ebp };
+        void* pvReturn = puEBP[1];
 
-    puEBP = (void**)puEBP[0];
-    void* pvReturn2 = puEBP[1];
+        puEBP = (void**)puEBP[0];
+        void* pvReturn2 = puEBP[1];
 
-    printf("SID  (CLIENT -> SERVER) Packet ID: 0x%02x -> Caller: 0x%08x, Caller's Caller 0x%08x \n", (BYTE)nPacketId, (int)pvReturn, (int)pvReturn2);
+        printf("SID  (CLIENT -> SERVER) Packet ID: 0x%02x -> Caller: 0x%08x, Caller's Caller 0x%08x \n", (BYTE)nPacketId, (int)pvReturn, (int)pvReturn2);
 
-    gamelog << COLOR(1) << "SID " << COLOR(4) << "(CLIENT -> SERVER)" << COLOR(0) << " 0x" << std::hex << (BYTE)nPacketId << std::dec << " size of " << nSizeNoHeader << std::endl;
-
+        gamelog << COLOR(1) << "SID " << COLOR(4) << "(CLIENT -> SERVER)" << COLOR(0) << " 0x" << std::hex << (BYTE)nPacketId << std::dec << " size of " << nSizeNoHeader << std::endl;
+    }
 }
 
 // MCP (SERVER -> CLIENT)
@@ -51,7 +54,9 @@ void __fastcall NET_MCP_CLIENT_IncomingPacketsHandler_Replacement(BYTE* pBytes, 
 {
     NET_MCP_CLIENT_IncomingPacketsHandler(pBytes, nSize);
 
-    gamelog << COLOR(2) << "MCP " << COLOR(4) << "(SERVER -> CLIENT)" << COLOR(0) << " 0x" << std::hex << pBytes[0] << std::dec << " size of " << nSize << std::endl;
+    if (Settings["debugPackets"]) {
+        gamelog << COLOR(2) << "MCP " << COLOR(4) << "(SERVER -> CLIENT)" << COLOR(0) << " 0x" << std::hex << pBytes[0] << std::dec << " size of " << nSize << std::endl;
+    }
 }
 
 // MCP (CLIENT -> SERVER)
@@ -70,17 +75,18 @@ void __stdcall NET_MCP_CLIENT_Send_Hook(void* pQSocket, BYTE* pBytes, short nDat
 {
     NET_MCP_CLIENT_Send_Relocated(pQSocket, pBytes, nDataSizeNoHeader);
 
-    void** puEBP = NULL;
-    __asm { mov puEBP, ebp };
-    void* pvReturn = puEBP[1];
+    if (Settings["debugPackets"]) {
+        void** puEBP = NULL;
+        __asm { mov puEBP, ebp };
+        void* pvReturn = puEBP[1];
 
-    puEBP = (void**)puEBP[0];
-    void* pvReturn2 = puEBP[1];
+        puEBP = (void**)puEBP[0];
+        void* pvReturn2 = puEBP[1];
 
-    printf("MCP  (CLIENT -> SERVER) Packet ID: 0x%02x -> Caller: 0x%08x, Caller's Caller 0x%08x \n", pBytes[0], (int)pvReturn, (int)pvReturn2);
+        printf("MCP  (CLIENT -> SERVER) Packet ID: 0x%02x -> Caller: 0x%08x, Caller's Caller 0x%08x \n", pBytes[0], (int)pvReturn, (int)pvReturn2);
 
-    gamelog << COLOR(1) << "MCP " << COLOR(4) << "(CLIENT -> SERVER)" << COLOR(0) << " 0x" << std::hex << pBytes[0] << std::dec << " size of " << nDataSizeNoHeader << std::endl;
-
+        gamelog << COLOR(1) << "MCP " << COLOR(4) << "(CLIENT -> SERVER)" << COLOR(0) << " 0x" << std::hex << pBytes[0] << std::dec << " size of " << nDataSizeNoHeader << std::endl;
+    }
 }
 
 // D2GS (SERVER -> CLIENT)
@@ -94,7 +100,7 @@ REMOTEFUNC(void __fastcall, NET_D2GS_CLIENT_PacketHandle_from0xAF, (BYTE* pBytes
 
 void __fastcall NET_D2GS_CLIENT_PacketHandler_Replacement(BYTE* pBytes, size_t nSize)
 {
-    if (nSize != 0xffffffff)
+    if (nSize != 0xffffffff && Settings["debugPackets"])
         gamelog << COLOR(2) << "D2GS " << COLOR(4) << "(SERVER -> CLIENT)" << COLOR(0) << " 0x" << std::hex << pBytes[0] << std::dec << " size of " << nSize << std::endl;
 
     if (pBytes[0] >= 0xAF) {
@@ -129,16 +135,18 @@ void* __stdcall NET_D2GS_CLIENT_Send_Hook(size_t nSize, int Unused, BYTE* pBytes
 {
     void* ret = NET_D2GS_CLIENT_Send_Relocated(nSize, Unused, pBytes);
 
-    void** puEBP = NULL;
-    __asm { mov puEBP, ebp };
-    void* pvReturn = puEBP[1];
+    if (Settings["debugPackets"]) {
+        void** puEBP = NULL;
+        __asm { mov puEBP, ebp };
+        void* pvReturn = puEBP[1];
 
-    puEBP = (void**)puEBP[0];
-    void* pvReturn2 = puEBP[1];
+        puEBP = (void**)puEBP[0];
+        void* pvReturn2 = puEBP[1];
 
-    printf("D2GS (CLIENT -> SERVER) Packet ID: 0x%02x -> Caller: 0x%08x, Caller's Caller 0x%08x \n", pBytes[0], (int)pvReturn, (int)pvReturn2);
+        printf("D2GS (CLIENT -> SERVER) Packet ID: 0x%02x -> Caller: 0x%08x, Caller's Caller 0x%08x \n", pBytes[0], (int)pvReturn, (int)pvReturn2);
 
-    gamelog << COLOR(1) << "D2GS " << COLOR(4) << "(CLIENT -> SERVER)" << COLOR(0) << " 0x" << std::hex << pBytes[0] << std::dec << " size of " << nSize << std::endl;
+        gamelog << COLOR(1) << "D2GS " << COLOR(4) << "(CLIENT -> SERVER)" << COLOR(0) << " 0x" << std::hex << pBytes[0] << std::dec << " size of " << nSize << std::endl;
+    }
 
     return ret;
 }
