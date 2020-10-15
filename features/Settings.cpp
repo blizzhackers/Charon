@@ -231,6 +231,14 @@ std::vector<std::vector<DialogToggleInfo*>> SettingsColumns = {
                 Settings["debugMode"] = !Settings["debugMode"];
                 SaveSettings();
             }),
+        new DialogToggleInfo(L"Debug Packets",
+            []() -> std::wstring {
+                return Settings["debugPackets"] ? L"\u00FFc2On" : L"\u00FFc1Off";
+            }, [](MouseButton button, bool down) -> void {
+                if (down) return;
+                Settings["debugPackets"] = !Settings["debugPackets"];
+                SaveSettings();
+            }),
     },
 };
 
