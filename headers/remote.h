@@ -4,6 +4,7 @@
 #include "D2Structs.h"
 
 typedef unsigned long ASMPTR;
+typedef unsigned int uint;
 
 #ifdef DEFINE_REMOTE_REFERENCES
 
@@ -33,6 +34,7 @@ namespace D2 {
 	GLOBALREF(HINSTANCE, hInst, 0x7C8CA8);
 	GLOBALREF(HWND, hWnd, 0x7C8CBC);
 	GLOBALREF(int, CurrentGameType, 0x7A0610);
+	GLOBALREF(Types::UIFlagStrc, GFX_bShowUIFlag, 0x7a27c0);
 
 	// For referencing D2's functions use this specialized macro instead
 	GLOBALFUNC(DWORD __fastcall, SetFont, (DWORD dwFileNo), 0x502EF0);
@@ -66,6 +68,9 @@ namespace D2 {
     GLOBALFUNC(void __fastcall, FindSpawnablePosition, (D2::Types::Room1* pDrlgRoom, POINT* pos, DWORD param_1_00, DWORD param_2_00, D2::Types::Room1** pRoomsNear, DWORD param_6, int param_7), 0x545340);
     GLOBALFUNC(void __stdcall, UnitLocation, (D2::Types::UnitAny* pUnit, POINT* pPoint), 0x620870);
     GLOBALFUNC(DWORD __stdcall, GetAct, (int levelId), 0x6427f0);
+
+    GLOBALFUNC(Types::UnitAny* __fastcall, UNIT_CreateUnit, (BYTE type ,int nClassId,int x,int y,Types::IncompleteGameData *pGame,Types::Room1 *pDrlgRoom,BYTE unknown), 0x555230);
+    GLOBALFUNC(Types::UnitAny* * __fastcall, SERVER_CreateUnit,(Types::IncompleteGameData *pGame,Types::Room1 *pRoom,BYTE eD2UnitType,int nMonStatsId, int nPositionX,int nPositionY,BOOL bUseMonStats),0x5557d0)
 }
 
 #pragma warning( default : 4229 )

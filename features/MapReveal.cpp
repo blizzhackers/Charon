@@ -45,11 +45,14 @@ void __stdcall D2GFX_DrawSprite6_override(D2::Types::DC6Context *pDC6Context, in
     if (cellno < 0) {
         if (Settings["revealLevel"]) {
             DWORD width = 0, height = 0, fontNum = 6;
-            wchar_t* levelNameUnicode = D2::GetLevelText(-cellno)->wName;
-            D2::SetFont(fontNum);
-            height = D2::GetTextSize(levelNameUnicode, &width, &fontNum);
-            int offsetx = 8 - ((int)width / 2), offsety = -16;
-            D2::DrawGameText(levelNameUnicode, x + offsetx, y + offsety, 0, false);
+            auto test = D2::GetLevelText(-cellno);
+            if (test != nullptr) {
+                wchar_t *levelNameUnicode = test->wName;
+                D2::SetFont(fontNum);
+                height = D2::GetTextSize(levelNameUnicode, &width, &fontNum);
+                int offsetx = 8 - ((int) width / 2), offsety = -16;
+                D2::DrawGameText(levelNameUnicode, x + offsetx, y + offsety, 0, false);
+            }
         }
     }
     else {

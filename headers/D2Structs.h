@@ -1345,6 +1345,49 @@ namespace D2 {
             FIELDTYPE_DATA_BIT = 26,
         };
 
+        struct UIFlagStrc {
+            BOOL None;
+            BOOL Inventory;
+            BOOL CharStat;
+            BOOL QuickSkill;
+            BOOL Skill;
+            BOOL ChatInput;
+            BOOL EquipmentPane;
+            BOOL NewSkill;
+            BOOL NpcMenu;
+            BOOL EscMenu;
+            BOOL Automap;
+            BOOL ConfigControls;
+            BOOL NpcShop;
+            BOOL AltShowItems;
+            BOOL Cash;
+            BOOL Quest;
+            BOOL PartyPane;
+            BOOL QuestLogButton;
+            BOOL StatusArea;
+            BOOL PartyIcons;
+            BOOL WaypointMenu;
+            BOOL MiniPanel;
+            BOOL PartyMenu;
+            BOOL TradePrompt;
+            BOOL MessageLog;
+            BOOL StashMenu;
+            BOOL CubeMenu;
+            BOOL Unknown0x1B;
+            BOOL Unknown0x1C;
+            BOOL Unknown0x1D;
+            BOOL Unknown0x1E;
+            BOOL FullBelt;
+            BOOL Unknown0x20;
+            BOOL HelpMenu;
+            BOOL HelpScreenRedButton;
+            BOOL HireIcons;
+            BOOL MercMenu;
+            BOOL UnusedScroll;
+        };
+
+
+
         struct BINField {
             char* fieldName;
             BINFieldType type;
