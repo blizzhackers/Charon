@@ -11,6 +11,8 @@ REMOTEREF(DWORD, PlayerCountOverride, 0x883d70);
 REMOTEFUNC(DWORD __fastcall, CALC_Experience, (Ghidra::D2UnitStrc* pUnit, int dummy, Ghidra::D2GameStrc* pGame, unsigned int param_3), 0x57e3f0)
 REMOTEFUNC(Ghidra::D2ClientStrc* __stdcall, PLAYER_GetClientFromUnitData, (Ghidra::D2UnitStrc* pUnit), 0x5531c0)
 REMOTEFUNC(void __fastcall, SERVER_KillExperience, (Ghidra::D2GameStrc* pGame, Ghidra::D2UnitStrc* pAttacker, Ghidra::D2UnitStrc* pVictim), 0x57e990)
+REMOTEFUNC(unsigned int __stdcall, TXT_Experience_GetLineLevel, (int eClassId, int nLevel), 0x611800)
+REMOTEFUNC(int __stdcall, UNIT_GetUnitStat, (Ghidra::D2UnitStrc* pUnit, int eUnitStat, short nLayer), 0x625480)
 
 void __fastcall SERVER_KillExperience_intercept(Ghidra::D2GameStrc* pGame, Ghidra::D2UnitStrc* pAttacker, Ghidra::D2UnitStrc* pVictim) {
     pLastVictim = pVictim;
@@ -35,7 +37,9 @@ DWORD __fastcall ExperienceIntercept(Ghidra::D2UnitStrc* pUnit, int dummy, Ghidr
         }
     }
     else {
-        exp = 3520485254;
+        unsigned int maxExp = TXT_Experience_GetLineLevel(pUnit->eUnitType, 98);
+        unsigned int curExp = UNIT_GetUnitStat(pUnit, 0x0D, 0);
+        exp = maxExp - curExp;
     }
 
     for (Feature* f = Features; f; f = f->next) {
