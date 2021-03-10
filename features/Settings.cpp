@@ -204,8 +204,8 @@ std::vector<std::vector<DialogToggleInfo*>> SettingsColumns = {
                     Settings["xpBonus"] = 1;
                 }
 
-                if (Settings["xpBonus"] == 16) {
-                    return L"\u00FFc2x16";
+                if (Settings["xpBonus"] == 3) {
+                    return L"\u00FFc2x3";
                 }
                 else if (Settings["xpBonus"] >= 2) {
                     return L"\u00FFc4x" + std::to_wstring(Settings["xpBonus"]);
@@ -216,9 +216,19 @@ std::vector<std::vector<DialogToggleInfo*>> SettingsColumns = {
                 if (down) return;
 
                 if (button == MouseButton::LEFT && Settings["xpBonus"] < 1024 * 16) {
-                    Settings["xpBonus"] <<= 1;
+                    if (Settings["xpBonus"] < 4) {
+                        Settings["xpBonus"]++;
+                    }
+                    else {
+                        Settings["xpBonus"] <<= 1;
+                    }
                 } else if (button == MouseButton::RIGHT && Settings["xpBonus"] > 1) {
-                    Settings["xpBonus"] >>= 1;
+                    if (Settings["xpBonus"] <= 4) {
+                        Settings["xpBonus"]--;
+                    }
+                    else {
+                        Settings["xpBonus"] >>= 1;
+                    }
                 }
 
                 SaveSettings();
