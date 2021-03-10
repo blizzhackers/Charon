@@ -1,9 +1,6 @@
-#ifndef CHARON_GHIDRA_H
-#define CHARON_GHIDRA_H
-
+#pragma once
 
 // All generated files
+#include "./D2Structs.h"
 #include "./ghidra/main.h"
 #include "./ghidra/user.extensions.h"
-
-#endif //CHARON_GHIDRA_H
