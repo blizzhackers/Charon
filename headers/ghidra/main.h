@@ -30,45 +30,46 @@ typedef unsigned char uchar;
 typedef uchar BYTE;
 typedef unsigned long ulong;
 typedef ulong DWORD;
+typedef unsigned char byte;
 typedef int BOOL;
 typedef unsigned char undefined;
 typedef unsigned int undefined4;
-typedef unsigned char byte;
 typedef unsigned char undefined1;
 typedef PRTL_CRITICAL_SECTION LPCRITICAL_SECTION;
 typedef unsigned short ushort;
 typedef ushort WORD;
 typedef unsigned short undefined2;
+typedef  void (*callback_void11fpTimerFunction)(D2GameStrc*, D2UnitStrc*) ;
 typedef uchar uint8_t;
 typedef  void (*callback_void2pfAutoMap)(D2RoomStrc*) ;
 typedef  void (*callback_void3pfTownAutoMap)(enum eD2LevelId, int, int, int) ;
 typedef  void (*callback_void9pCallback)(D2RoomStrc*) ;
 typedef unsigned int dword;
 typedef  void (*callback_void1fpQuestStateHandler15)(D2QuestDataStrc*, D2QuestArgStrc*) ;
-typedef  bool (*callback_bool5fpStatusFilter)(D2QuestDataStrc*, D2UnitStrc*, D2BitBufferStrc*, D2BitBufferStrc*, BYTE*) ;
-typedef  bool (*callback_bool6fpActiveFilter)(D2QuestDataStrc*, int, D2UnitStrc*, D2BitBufferStrc*, D2UnitStrc*) ;
-typedef  bool (*callback_bool7fpSequenceFilter)(D2QuestDataStrc*, D2UnitStrc*, D2BitBufferStrc*, D2BitBufferStrc*, BYTE*) ;
-typedef  int (*callback_int10pfUpdate)(D2GameStrc*, D2QuestDataStrc*) ;
-typedef  void (*callback_void4fpAiFunction)(D2GameStrc*, D2UnitStrc*, D2AiParamStrc*) ;
-typedef  void (*callback_void8fpFunction)(D2GameStrc*, D2UnitStrc*, D2AiParamStrc*) ;
+typedef  bool (*callback_bool6fpStatusFilter)(D2QuestDataStrc*, D2UnitStrc*, D2BitBufferStrc*, D2BitBufferStrc*, BYTE*) ;
+typedef  bool (*callback_bool7fpActiveFilter)(D2QuestDataStrc*, int, D2UnitStrc*, D2BitBufferStrc*, D2UnitStrc*) ;
+typedef  bool (*callback_bool8fpSequenceFilter)(D2QuestDataStrc*) ;
+typedef  int (*callback_int12pfUpdate)(D2GameStrc*, D2QuestDataStrc*) ;
+typedef  void (*callback_void5fpAiFunction)(D2GameStrc*, D2UnitStrc*, D2AiParamStrc*) ;
+typedef  void (*callback_void10fpFunction)(D2GameStrc*, D2UnitStrc*, D2AiParamStrc*) ;
 typedef wchar_t WCHAR;
-typedef  BOOL (*callback_BOOL11fpItemEventFunc)(D2GameStrc*, int, D2UnitStrc*, D2UnitStrc*, void* , enum eD2Skills, int) ;
+typedef  BOOL (*callback_BOOL13fpItemEventFunc)(D2GameStrc*, int, D2UnitStrc*, D2UnitStrc*, void* , enum eD2Skills, int) ;
 typedef char CHAR;
 typedef uint UINT_PTR;
 typedef UINT_PTR SOCKET;
 typedef ushort u_short;
 typedef void* HANDLE;
 typedef  void (*callback_void32fpSID_StartAdVex3)(char* , char* , char* , int) ;
-typedef  BOOL (*callback_BOOL110fpDraw)(D2ControlStrc*) ;
-typedef  BOOL (*callback_BOOL111fpDrawEx)(D2ControlStrc*) ;
+typedef  BOOL (*callback_BOOL104fpDraw)(D2ControlStrc*) ;
+typedef  BOOL (*callback_BOOL105fpDrawEx)(D2ControlStrc*) ;
 typedef UINT_PTR WPARAM;
-typedef  BOOL (*callback_BOOL112fpPush)(D2ControlMsg*) ;
-typedef  BOOL (*callback_BOOL113fpMouse)(D2ControlMsg*) ;
-typedef  BOOL (*callback_BOOL114fpListCheck)(D2ControlMsg*) ;
-typedef  BOOL (*callback_BOOL115fpKey)(D2ControlMsg*) ;
-typedef  BOOL (*callback_BOOL116fpOnPress)(D2ControlStrc*) ;
-typedef  BOOL (*callback_BOOL117fpDrawAnim)(D2ControlStrc*) ;
-typedef  BOOL (*callback_BOOL118fpOnPressCallback)(D2ControlStrc*) ;
+typedef  BOOL (*callback_BOOL106fpPush)(D2ControlMsg*) ;
+typedef  BOOL (*callback_BOOL107fpMouse)(D2ControlMsg*) ;
+typedef  BOOL (*callback_BOOL108fpListCheck)(D2ControlMsg*) ;
+typedef  BOOL (*callback_BOOL109fpKey)(D2ControlMsg*) ;
+typedef  BOOL (*callback_BOOL110fpOnPress)(D2ControlStrc*) ;
+typedef  BOOL (*callback_BOOL111fpDrawAnim)(D2ControlStrc*) ;
+typedef  BOOL (*callback_BOOL112fpOnPressCallback)(D2ControlStrc*) ;
 struct D2PoolBlockStrc{
 	BYTE* pCommit; 
 	DWORD* pUsage; 
@@ -106,15 +107,23 @@ struct D2PoolManagerStrc{
 	char szName[32]; 
 };
 
+union uD2UnitMode{
+	enum eD2PlayerAnimMode ePlayerMode; /* match with plrmode..txt*/
+	enum eD2MonsterAnimMode eMonsterMode; /* match with monmode.txt*/
+	enum eD2ObjectAnimMode eObjectMode; /* match with objmode.txt*/
+	enum eD2ItemAnimMode eItemMode; /* holds up information about container*/
+	enum eCollisionFlags eMissileCollision; /* hold up information about missile collision*/
+};
+
 struct D2SeedStrc{
 	int nSeedLow; 
 	int nSeedHigh; 
 };
 
 struct D2BitBufferStrc{
-	char* pBuffer; 
+	byte* pBuffer; 
 	size_t nBitsInBuffer; 
-	size_t nCufferPos; 
+	size_t nCurrentPos; 
 	size_t nBitsAtPos; 
 	BOOL bEnd; 
 };
@@ -128,13 +137,27 @@ struct D2UnitDataPlayerArenaStrc{
 	undefined4 _0[2]; // compressed
 };
 
+struct D2PetDataStrc{
+	int nSeed; 
+	int nNameId; 
+	int nType; 
+};
+
 struct D2PetStrc{
-	int flag; 
-	undefined4 _0[2]; // compressed
+	byte nFlags; 
+	int nPetGUID; 
+	D2PetDataStrc pPetData; 
+	D2PetStrc* pNext; 
+};
+
+struct D2PetListStrc{
+	D2PetStrc* pPets; 
+	int nPets; 
+	int nMax; 
 };
 
 struct D2UnitDataPlayerPetsStrc{
-	D2PetStrc* pPet; 
+	D2PetListStrc* pPetList[1]; 
 };
 
 struct D2UnitDataPlayerInteractedNPCStrc{
@@ -151,21 +174,39 @@ struct D2PartyDataStrc{
 	D2PartyDataStrc* pPrev; 
 };
 
-struct D2EventEntryStrc{
-	undefined _0[28]; // compressed
-	D2EventEntryStrc* pNext; 
-	undefined _1[16]; // compressed
+/* Can be also called */
+struct D2TimerStrc{
+	enum eD2TimerType nTimerType; /* the type of the timer, this varies between unit types*/
+	undefined field_0x1; 
+	short nFlags; 
+	int nFrame; 
+	D2UnitStrc* pUnit; /* the unit the timer is assigned to*/
+	int nUnitGUID; /* the global unique identifier of the unit the list is assigned to*/
+	enum eD2UnitType eUnitType; /* the unit type of the unit this timer is assigned to*/
+	int field_0x14; 
+	D2TimerListStrc* pPreviousTimer; /* the previous timer overall*/
+	D2TimerListStrc* pNextTimerList; /* the next timer overall*/
+	D2TimerListStrc* pPreviousTimerOnUnit; /* the previous timer assigned to this unit*/
+	D2TimerListStrc* pNextTimerOnUnit; /* the next timer assigned to this unit*/
+	D2TimerListStrc* pTimerList; /* the timer list this timer belongs to*/
+	callback_void11fpTimerFunction * fpTimerFunction; /* function called when the timer ends*/
 };
 
-struct D2EventStrc{
-	D2EventEntryStrc aEvents[600]; 
-	D2EventStrc* pNext; 
-	D2EventStrc* pPrev; 
+/* Can be also called */
+struct D2TimerListStrc{
+	D2TimerStrc pTimerList[600]; /* allocated in realtime*/
+	D2TimerListStrc* pFirstList; /* points to self*/
+	D2TimerListStrc* pNextList; /* unknown whenever it actually points to another TimerList, always NULL*/
 };
 
-struct D2EventControlStrc{
-	undefined _0[2588]; // compressed
-	D2EventStrc* pEvent; 
+/* Can be also called */
+struct D2TimerQueueStrc{
+	int nIndex; 
+	D2TimerListStrc* pActiveTimersByType[5][64]; /* 5 lists of lists timers for each unit type that are currently active (none for tiles)*/
+	D2TimerListStrc* pDispatchedTimersByType[5][64]; /* 5 lists of lists of finished timers, that can be repurposed*/
+	D2TimerListStrc* pTimerListByType[5]; /* Array of Events for each unit Type*/
+	D2TimerListStrc* pTimerTemp; /* Created by retype action*/
+	D2TimerListStrc* pTimerList; 
 };
 
 struct D2DrlgEnvironmentStrc{
@@ -266,13 +307,13 @@ struct D2DrlgCoordsStrc{
 	POINT WorldSize; 
 };
 
-struct D2DrlgRoomExSub00Strc{
+struct D2DrlgOrthStrc{
 	D2RoomExStrc* pRoomEx; 
 	undefined _0[4]; // compressed
 	BOOL bIsDrlgTypePresetArea; 
 	int nNextCount; 
 	D2DrlgCoordsStrc* psCoordinatesAndSize; 
-	D2DrlgRoomExSub00Strc* pSub00Next; /* Created by retype action*/
+	D2DrlgOrthStrc* pNext; /* Created by retype action*/
 };
 
 struct D2DrlgGridStrc{
@@ -370,21 +411,28 @@ struct D2LvlPrestTxt{
 	int Dt1Mask; 
 };
 
-struct D2DrlgLevelSub1B0Strc{
-	void* field_0x0; 
+struct D2DrlgFileStrc{
+	undefined4 _0[3]; // compressed
+	int nSizeX; 
+	int nSizeY; 
+	undefined4 _1[18]; // compressed
+};
+
+struct D2DrlgMapStrc{
+	D2DrlgMapStrc* pPrev; 
 	int nRandomMapFileSelector; /* Created by retype action*/
 	D2LvlPrestTxt* pTxtLevelPrest; 
-	undefined _0[4]; // compressed
+	D2DrlgFileStrc* pDrlgFile; 
 	int nRealOffsetX; 
 	int nRealOffsetY; 
 	int nSizeX; 
 	int nSizeY; 
-	undefined _1[52]; // compressed
-	D2DrlgLevelSub1B0Strc* pNext; 
+	undefined _0[52]; // compressed
+	D2DrlgMapStrc* pNext; 
 };
 
 struct D2DrlgLevelDataPresetArea{
-	D2DrlgLevelSub1B0Strc* pDrlgLevelSub1B0Strc; 
+	D2DrlgMapStrc* pDrlgLevelSub1B0Strc; 
 	int nMapVersion; 
 };
 
@@ -459,7 +507,7 @@ struct D2DrlgLevelStrc{
 	D2DrlgCoordsStrc sCoordinatesAndSize; 
 	char aUnknown0x2C[384]; 
 	D2DrlgLevelStrc* pLevelNext; 
-	D2DrlgLevelSub1B0Strc* pDrglLevelSub1B0; /* Created by retype action*/
+	D2DrlgMapStrc* pDrglLevelSub1B0; /* Created by retype action*/
 	D2DrlgStrc* pDrlgActMisc; /* Created by retype action*/
 	undefined _2[4]; // compressed
 	pointer pUnknownStructure0x1BC; 
@@ -467,7 +515,7 @@ struct D2DrlgLevelStrc{
 	D2SeedStrc sSeed; /* Created by retype action*/
 	pointer pIAmStructUnknownSize_0x1CC; 
 	enum eD2LevelId eD2LevelId; 
-	undefined _3[4]; // compressed
+	int nCounter; 
 	int nUnknown0x1D8; 
 	int nLastRoomExCoordsIndex; 
 	char aUnknown0x1E0[76]; 
@@ -510,7 +558,7 @@ struct D2DrlgCoordListStrc{
 };
 
 struct D2RoomExStrc{
-	D2DrlgRoomExSub00Strc* psSub00; 
+	D2DrlgOrthStrc* pRoomData; 
 	int nSeed; 
 	D2RoomExStrc** ppDrlgRoomsExNear; 
 	undefined _0[4]; // compressed
@@ -726,14 +774,14 @@ struct D2QuestDataStrc{
 	D2NPCMessageTableStrc* pNpcMessages; 
 	enum eD2Quests nQuestIdReal; 
 	enum eD2Quests nSubQuestId; 
-	callback_bool5fpStatusFilter * fpStatusFilter; 
-	callback_bool6fpActiveFilter * fpActiveFilter; 
-	callback_bool7fpSequenceFilter * fpSequenceFilter; 
+	callback_bool6fpStatusFilter * fpStatusFilter; 
+	callback_bool7fpActiveFilter * fpActiveFilter; 
+	callback_bool8fpSequenceFilter * fpSequenceFilter; 
 	D2QuestDataStrc* pPrev; 
 };
 
 struct D2QuestTimerStrc{
-	callback_int10pfUpdate * pfUpdate; 
+	callback_int12pfUpdate * pfUpdate; 
 	D2QuestDataStrc* pQuest; 
 	int dwTicks; 
 	int dwTimeout; 
@@ -855,7 +903,7 @@ struct D2GameStrc{
 	int dwCycleLastSecond; 
 	int dwCycleCount; 
 	int dwTickCount; 
-	D2EventControlStrc* pEventControl; 
+	D2TimerQueueStrc* pTimerQueue; 
 	D2DrlgActStrc* pAct[5]; 
 	D2SeedStrc pGameSeed; 
 	D2InactiveUnitListStrc* pInactiveUnitList[5]; 
@@ -895,7 +943,10 @@ struct D2PacketListStrc{
 };
 
 struct D2ClientHotKeyStrc{
-	undefined _0[8]; // compressed
+	short field_0x0; 
+	byte field_0x2; 
+	undefined field_0x3; 
+	int nItemGUID; 
 };
 
 /* Used to send the server packet 0x18, 0x95, */
@@ -919,7 +970,7 @@ struct D2ClientStrc{
 	int ConnectionState; 
 	byte nClass; 
 	undefined1 field_0x9; 
-	short fFileFlags; /* nLevelExpLayer*/
+	short nCharacterStatus; /* nLevelExpLayer*/
 	byte nCharTemplate; 
 	char szCharName[16]; 
 	char szAccName[64]; 
@@ -1340,8 +1391,8 @@ struct D2MonStats2Txt{
 };
 
 struct D2AiParamStrc{
-	D2MonsterAiGeneralStrc* pMonsterAiGeneral; 
-	callback_void4fpAiFunction * fpAiFunction; 
+	D2AiGeneralStrc* pMonsterAiGeneral; 
+	callback_void5fpAiFunction * fpAiFunction; 
 	D2UnitStrc* pTarget; 
 	int _0[2]; // compressed
 	int nDistanceToTarget; 
@@ -1361,9 +1412,9 @@ struct D2MonsterDataMinionList{
 	D2MonsterDataMinionList* pNext; 
 };
 
-struct D2MonsterAiGeneralStrc{
+struct D2AiGeneralStrc{
 	int nFunctionId; 
-	callback_void8fpFunction * fpFunction; 
+	callback_void10fpFunction * fpFunction; 
 	int nAiFlags; 
 	int nOwnerGUID; 
 	enum eD2UnitType eOwnerType; 
@@ -1380,11 +1431,8 @@ struct D2MonsterAiGeneralStrc{
 	int nGenericSpawnerSpecific; 
 };
 
-struct D2MonsterModeStrc{
-	undefined _0[24]; // compressed
-	int _1[2]; // compressed
-	byte field_0x20; 
-	undefined _2[3]; // compressed
+struct D2MonsterNameStrc{
+	WCHAR wszMonsterName[18]; 
 };
 
 struct D2MonsterAiStrc{
@@ -1401,15 +1449,17 @@ struct D2UnitDataMonsterStrc{
 	byte MonUModList[9]; 
 	undefined field_0x25; 
 	short nBossNo; 
-	D2MonsterAiGeneralStrc* pMonsterAiGeneral; 
-	D2MonsterModeStrc* pMonsterMode; 
+	D2AiGeneralStrc* pAiGeneral; 
+	D2MonsterNameStrc* pMonsterName; 
 	D2MonsterAiStrc* pMonsterAi; 
-	undefined4 _0[3]; // compressed
+	int nAiRelated1; 
+	int nAiRelated2; 
+	undefined4 field_0x3c; 
 	int nNecroPet; 
-	undefined4 _1[3]; // compressed
+	undefined4 _0[3]; // compressed
 	pointer pVision; 
 	int nAiState; 
-	enum eD2LevelId eD2LevelId; 
+	enum eD2LevelId eLevelId; 
 	int nSummonerFlags; 
 };
 
@@ -1538,7 +1588,8 @@ struct D2UnitDataMissileStrc{
 	short nSkillNo; 
 	short nSkillLevel; 
 	short TotalFrames; 
-	int CurrentFrame; 
+	short CurrentFrame; 
+	undefined _1[2]; // compressed
 	int MissileFlags; 
 	enum eD2UnitType eOwnerType; 
 	int nOwnerGUID; 
@@ -1546,7 +1597,7 @@ struct D2UnitDataMissileStrc{
 	int nTargetGUID; 
 	int HomeStatus; 
 	D2CoordsShort sCoords; 
-	undefined _1[4]; // compressed
+	undefined _2[4]; // compressed
 };
 
 struct D2UnitDataItemStrc{
@@ -1567,7 +1618,7 @@ struct D2UnitDataItemStrc{
 	short wMagicPrefix[3]; 
 	short wMagicSuffix[3]; 
 	enum eD2BodyLoc eBodyLoc; 
-	enum EInventoryPage ePage; 
+	enum eInventoryPage ePage; 
 	undefined1 eExchangePage; 
 	undefined1 ePreviousPage; 
 	byte nEarLevel; 
@@ -1636,38 +1687,41 @@ struct D2DynamicPathStrc{
 	int dwPathPoints; 
 	void* field_0x2c; 
 	D2UnitStrc* pOwner; 
-	int nFlags; /* Created by retype action*/
+	enum eD2DynamicPathFlags nFlags; /* Created by retype action*/
 	int field_0x38; 
 	enum eD2PathTypes ePathType; 
 	enum eD2PathTypes dwPrevPathType; 
-	int dwUnitSize; /* Created by retype action*/
-	int dwCollisionPattern; /* Created by retype action*/
-	int eCollisionFlag; /* Cast To eCollisionFlags*/
+	int nUnitSize; /* Created by retype action*/
+	int nUnitWidth; 
+	int nCollisionFlag; /* Cast To eCollisionFlags*/
 	int field_0x50; 
-	short _0[2]; // compressed
+	enum eCollisionFlags eCollisionFlag; 
+	short field_0x56; 
 	D2UnitStrc* pTargetUnit; /* Created by retype action*/
 	enum eD2UnitType eTargetType; 
 	int nTargetGUID; 
 	byte nDirection; /* Created by retype action*/
 	byte nNewDirection; 
 	byte nDiffDirection; 
-	byte _1[11]; // compressed
-	int _2[2]; // compressed
+	byte _0[11]; // compressed
+	int _1[2]; // compressed
 	char field_0x7a[2]; 
 	int dwVelocity; 
-	int field_0x80; 
-	int dwVelocity2; 
-	int _3[2]; // compressed
+	int nCurrentVelocity; 
+	int nMaxVelocity; 
+	int nAcceleration; 
+	int field_0x8c; 
 	byte nDist; 
 	byte nDistMax; 
-	byte field_0x92; 
+	byte nIdaStarVariable; 
 	byte nStepNum; 
 	byte nDistance; 
-	byte _4[3]; // compressed
+	byte _2[3]; // compressed
 	D2PathPointStrc PathPoints[7]; 
-	int _5[73]; // compressed
+	int _3[72]; // compressed
+	int nInitCoordsSize; 
 	D2PathPointStrc pInitCoords; 
-	int _6[9]; // compressed
+	int _4[9]; // compressed
 };
 
 union D2PathUnion{
@@ -1676,7 +1730,7 @@ union D2PathUnion{
 };
 
 struct D2AnimSeqStrc{
-	int field_0x0; 
+	int nFrame; 
 };
 
 struct D2AnimDataRecordStrc{
@@ -1690,6 +1744,37 @@ struct D2AnimDataStrc{
 	D2AnimDataRecordStrc* pRecords; 
 	D2AnimDataRecordStrc* pHashTable[256]; 
 	D2AnimDataRecordStrc pDefaultRecord; 
+};
+
+struct D2GfxInfoUnkStrc{
+	int _0[2]; // compressed
+	int* field_0x8; 
+	int field_0xc; 
+	D2GfxInfoUnkStrc* pNext; 
+};
+
+struct D2ParticleOffset3DVectorStrc{
+	int nOffsetX; 
+	int nOffsetY; 
+	int nOffsetZ; 
+};
+
+struct D2ParticleStrc{
+	int nFlags; 
+	int nPosX; 
+	int nPosY; 
+	int nPosZ; 
+	D2ParticleOffset3DVectorStrc pOffsets[3]; 
+	int _0[6]; // compressed
+};
+
+struct D2GfxInfoStrc{
+	undefined4 _0[10]; // compressed
+	D2GfxInfoUnkStrc* pGfxInfoUnk; 
+	pointer field_0x2c; 
+	D2ParticleStrc* pParticle; 
+	int field_0x34; 
+	int nPalShiftIndex; 
 };
 
 struct D2StatInfoStrc{
@@ -1747,7 +1832,7 @@ struct D2LightMapStrc{
 	byte nBlue; 
 	D2LightMapStrc* pPrev; 
 	int field_0x2c; 
-	int* pSub0x30; 
+	int* pPixelMapMaybe; 
 };
 
 struct D2TimerArgStrc{
@@ -1766,7 +1851,7 @@ struct D2SUnitEventStrc{
 	undefined4 _0[2]; // compressed
 	enum eD2Skills eSkill; 
 	undefined4 field_0x10; 
-	callback_BOOL11fpItemEventFunc * fpItemEventFunc; 
+	callback_BOOL13fpItemEventFunc * fpItemEventFunc; 
 	D2SUnitEventStrc* pNext; 
 	D2SUnitEventStrc* pPrev; 
 };
@@ -1777,9 +1862,10 @@ union D2UnitEvent{
 };
 
 struct D2HoverTextStrc{
-	int _0[2]; // compressed
+	int field_0x0; 
+	int nExpireFrame; 
 	byte nLanguageCode; 
-	undefined _1[3]; // compressed
+	undefined _0[3]; // compressed
 	int field_0xc; 
 	char szMessage[256]; 
 };
@@ -1913,7 +1999,6 @@ struct D2SkillsTxt{
 	int MaxLevDam[5]; 
 	int DmgSymPerCalc; 
 	enum eSkillEType EType; 
-	undefined _9[3]; // compressed
 	int EMin; 
 	int EMax; 
 	int EMinLev[5]; 
@@ -1966,10 +2051,6 @@ struct D2ServerCmdStrc{
 	char* aBuffers; 
 };
 
-struct D2TimerStrc{
-	
-};
-
 /* Size is different for each */
 struct D2SUnitMsgStrc{
 	D2SUnitMsgStrc* pNext; 
@@ -1982,7 +2063,7 @@ struct D2UnitStrc{
 	int nClassId; /* Created by retype action*/
 	D2PoolManagerStrc* pMemory; /* Created by retype action*/
 	int nUnitGUID; /* Created by retype action*/
-	int nAnimMode; 
+	uD2UnitMode eAnimMode; 
 	D2UnitDataUnion pUnitData; 
 	byte nAct; /* Created by retype action*/
 	undefined _0[3]; // compressed
@@ -2001,7 +2082,7 @@ struct D2UnitStrc{
 	byte nActionFrame; 
 	undefined field_0x4f; 
 	D2AnimDataStrc* pAnimData; 
-	pointer pGfxInfo; 
+	D2GfxInfoStrc* pGfxInfo; 
 	int nOutlineFrame; 
 	D2StatListExStrc* pStatsEx; 
 	D2InventoryStrc* pInventory; /* Created by retype action*/
@@ -2010,7 +2091,8 @@ struct D2UnitStrc{
 	undefined _1[2]; // compressed
 	short nUpdateType; 
 	D2UnitStrc* pUpdateUnit; 
-	undefined _2[8]; // compressed
+	undefined _2[4]; // compressed
+	BOOL bSparkyChest; 
 	D2TimerArgStrc* pTimerArg; 
 	D2GameStrc* pGame; /* Created by retype action*/
 	undefined _3[8]; // compressed
@@ -2033,7 +2115,7 @@ struct D2UnitStrc{
 	int nNodeTableIndex; /* Created by retype action*/
 	undefined _7[4]; // compressed
 	D2ServerCmdStrc* pServerCmd; 
-	D2TimerStrc* pTimer; /* Created by retype action*/
+	D2TimerListStrc* pTimerList; 
 	D2UnitStrc* pUnitNext_0; 
 	D2UnitStrc* pUnitNext; 
 	D2UnitStrc* pRoomFirstUnit; 
@@ -2074,17 +2156,20 @@ struct D2CharSelCompStrc{
 };
 
 struct D2CharSelStrc{
-	CHAR field_0x0[256]; 
+	CHAR szCharname[256]; 
 	WCHAR field_0x100[256]; 
 	char szUnk1[16]; 
 	char szUnk2[16]; 
 	bool field_0x320; 
 	undefined field_0x321; 
-	undefined2 _0[4]; // compressed
-	undefined _1[10]; // compressed
+	undefined2 field_0x322; 
+	short nCharacterFlags; 
+	short field_0x326; 
+	undefined2 field_0x328; 
+	undefined _0[10]; // compressed
 	int field_0x334; 
 	D2CharSelCompStrc* pCharSelCompStrc; 
-	undefined _2[16]; // compressed
+	undefined _1[16]; // compressed
 	D2CharSelStrc* pNext; 
 };
 
@@ -2277,14 +2362,14 @@ struct D2ControlStrc{
 	int dwPosY; 
 	int dwSizeX; 
 	int dwSizeY; 
-	callback_BOOL110fpDraw * fpDraw; 
-	callback_BOOL111fpDrawEx * fpDrawEx; 
-	callback_BOOL112fpPush * fpPush; 
-	callback_BOOL113fpMouse * fpMouse; 
-	callback_BOOL114fpListCheck * fpListCheck; 
-	callback_BOOL115fpKey * fpKey; 
-	callback_BOOL116fpOnPress * fpOnPress; 
-	callback_BOOL117fpDrawAnim * fpDrawAnim; 
+	callback_BOOL104fpDraw * fpDraw; 
+	callback_BOOL105fpDrawEx * fpDrawEx; 
+	callback_BOOL106fpPush * fpPush; 
+	callback_BOOL107fpMouse * fpMouse; 
+	callback_BOOL108fpListCheck * fpListCheck; 
+	callback_BOOL109fpKey * fpKey; 
+	callback_BOOL110fpOnPress * fpOnPress; 
+	callback_BOOL111fpDrawAnim * fpDrawAnim; 
 	D2ControlStrc* pNext; 
 };
 
@@ -2294,7 +2379,7 @@ struct FORMS_PredefinedFormStrc{
 	undefined4 field_0x14; 
 	int nLabelAsLocaleStringId; 
 	DC6* pDC6; 
-	callback_BOOL118fpOnPressCallback * fpOnPressCallback; 
+	callback_BOOL112fpOnPressCallback * fpOnPressCallback; 
 	undefined4 _0[3]; // compressed
 };
 
@@ -3208,7 +3293,7 @@ struct D2SetItemsTxt{
 	short dropsound; 
 	short usesound; 
 	char dropsfxframe; 
-	char addFunc; 
+	byte addFunc; 
 	D2UniqueSetItemsTxtEntry sEntry[9]; 
 	D2SetItemsTxtEntry sEntryEx[5]; 
 };
@@ -3403,10 +3488,6 @@ struct D2DifficultyLevelsTxt{
 	int GambleUltra; 
 };
 
-struct D2AutomapRelatedTxt{
-	void* _0[2]; // compressed
-};
-
 struct D2DataTableTxtStrc{
 	D2PlayerClassTxt* pTxtPlayerClass; 
 	D2TxtLinkStrc* pTxtPlayerClassLink; 
@@ -3580,10 +3661,6 @@ struct D2DataTableTxtStrc{
 	pointer pActMisc_0x468_B; 
 	pointer pActMisc_0x468_A; 
 	int pActMisc_0x008_A; 
-	D2SeedStrc sSeed; 
-	D2AutomapRelatedTxt sAutomapRelated; 
-	undefined4 _0[25]; // compressed
-	bool field_0xd0c; 
 };
 
 struct D2CoordStrc{
