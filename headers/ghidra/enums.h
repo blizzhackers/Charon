@@ -542,6 +542,106 @@ typedef enum eD2UnitType{
 	 UNIT_COUNT=6
 }eD2UnitType;
 
+typedef enum eD2PlayerAnimMode{
+	 Death=0,
+	 NeutralAnim=1,
+	 Walk=2,
+	 Run=3,
+	 GetHit=4,
+	 TownNeutral=5,
+	 TownWalk=6,
+	 Attack1=7,
+	 Attack2=8,
+	 Block=9,
+	 Cast=10,
+	 Throw=11,
+	 Kick=12,
+	 Skill1=13,
+	 Skill2=14,
+	 Skill3=15,
+	 Skill4=16,
+	 Dead=17,
+	 Sequence=18,
+	 KnockBack=19
+}eD2PlayerAnimMode;
+
+typedef enum eD2MonsterAnimMode{
+	 death=0,
+	 neutral=1,
+	 walk=2,
+	 gethit=3,
+	 attack1=4,
+	 attack2=5,
+	 block=6,
+	 cast=7,
+	 skill1=8,
+	 skill2=9,
+	 skill3=10,
+	 skill4=11,
+	 dead=12,
+	 knockback=13,
+	 sequence=14,
+	 run=15
+}eD2MonsterAnimMode;
+
+typedef enum eD2ObjectAnimMode{
+	 Neutral=0,
+	 Operating=1,
+	 Opened=2,
+	 Special1=3,
+	 Special2=4,
+	 Special3=5,
+	 Special4=6,
+	 Special5=7
+}eD2ObjectAnimMode;
+
+typedef enum eD2ItemAnimMode{
+	 Container=0,
+	 Equipment=1,
+	 Belt=2,
+	 Ground=3,
+	 Cursor=4,
+	 Dropped=5,
+	 InItem=6
+}eD2ItemAnimMode;
+
+typedef enum eCollisionFlags{
+	 COLLIDE_NONE =0,
+	 COLLIDE_BLOCK_UNITS=1,
+	 COLLIDE_BLOCK_PLAYER =1,
+	 COLLIDE_BLOCK_MISSILE =2,
+	 COLLIDE_WALL =4,
+	 COLLIDE_BLOCK_LEAP =8,
+	 COLLIDE_ALTERNATE_FLOOR =16,
+	 COLLIDE_BLANK =32,
+	 COLLISION_INVALID=39,
+	 COLLIDE_MISSILE =64,
+	 COLLIDE_PLAYER =128,
+	 COLLIDE_MONSTER =256,
+	 COLLISION_LOS_THREAT=384,
+	 COLLIDE_ITEM =512,
+	 COLLIDE_OBJECT =1024,
+	 COLLIDE_DOOR =2048,
+	 COLLISION_ITEMS=2049,
+	 COLLISION_LOS_WALL=2052,
+	 COLLISION_LOS=2053,
+	 COLLISION_VISDOOR=2054,
+	 PLAYER_COLLISION_WW=3073,
+	 COLLIDE_UNIT_RELATED =4096,
+	 MONSTER_COLLISION_FLY=6148,
+	 PLAYER_COLLISION_DEFAULT=7177,
+	 COLLIDE_PET =8192,
+	 MONSTER_COLLISION_DOORS=13313,
+	 MONSTER_COLLISION_DEFAULT=15361,
+	 SPAWN_ITEM_COLLISION=15873,
+	 SPAWN_UNIT_COLLISION=16145,
+	 COLLIDE_4000 =16384,
+	 COLLISION_ALL_BUT_CORPSE=32767,
+	 COLLIDE_CORPSE =32768,
+	 COLLISION_WARP=48657,
+	 COLLISION_ALL=65535
+}eCollisionFlags;
+
 typedef enum eD2Skills{
 	 SKILL_Attack=0,
 	 SKILL_Kick=1,
@@ -910,48 +1010,30 @@ typedef enum eD2HostGameType{
 	 SGAMETYPE_COUNT=4
 }eD2HostGameType;
 
+typedef enum eD2TimerType{
+	 TIMER_0x00=0,
+	 TIMER_0x01=1,
+	 TIMER_0x02=2,
+	 TIMER_0x03=3,
+	 TIMER_0x04=4,
+	 TIMER_0x05=5,
+	 TIMER_0x06=6,
+	 TIMER_0x07=7,
+	 TIMER_0x08=8,
+	 TIMER_0x09=9,
+	 TIMER_0x0A=10,
+	 TIMER_0x0B=11,
+	 TIMER_0x0C=12,
+	 TIMER_0x0D=13,
+	 TIMER_0x0E=14,
+	 TIMER_COUNT=15
+}eD2TimerType;
+
 typedef enum eD2DrlgType{
 	 DRLGTYPE_RandomMaze=1,
 	 DRLGTYPE_PresetArea=2,
 	 DRLGTYPE_WildernessLevel=3
 }eD2DrlgType;
-
-typedef enum eCollisionFlags{
-	 COLLIDE_NONE =0,
-	 COLLIDE_BLOCK_UNITS=1,
-	 COLLIDE_BLOCK_PLAYER =1,
-	 COLLIDE_BLOCK_MISSILE =2,
-	 COLLIDE_WALL =4,
-	 COLLIDE_BLOCK_LEAP =8,
-	 COLLIDE_ALTERNATE_FLOOR =16,
-	 COLLIDE_BLANK =32,
-	 COLLISION_INVALID=39,
-	 COLLIDE_MISSILE =64,
-	 COLLIDE_PLAYER =128,
-	 COLLIDE_MONSTER =256,
-	 COLLISION_LOS_THREAT=384,
-	 COLLIDE_ITEM =512,
-	 COLLIDE_OBJECT =1024,
-	 COLLIDE_DOOR =2048,
-	 COLLISION_ITEMS=2049,
-	 COLLISION_LOS_WALL=2052,
-	 COLLISION_LOS=2053,
-	 COLLISION_VISDOOR=2054,
-	 PLAYER_COLLISION_WW=3073,
-	 COLLIDE_UNIT_RELATED =4096,
-	 MONSTER_COLLISION_FLY=6148,
-	 PLAYER_COLLISION_DEFAULT=7177,
-	 COLLIDE_PET =8192,
-	 MONSTER_COLLISION_DOORS=13313,
-	 MONSTER_COLLISION_DEFAULT=15361,
-	 SPAWN_ITEM_COLLISION=15873,
-	 SPAWN_UNIT_COLLISION=16145,
-	 COLLIDE_4000 =16384,
-	 COLLISION_ALL_BUT_CORPSE=32767,
-	 COLLIDE_CORPSE =32768,
-	 COLLISION_WARP=48657,
-	 COLLISION_ALL=65535
-}eCollisionFlags;
 
 typedef enum eD2Quests{
 	 QUEST_SpokeToWarriv=0,
@@ -1103,15 +1185,25 @@ typedef enum eD2BodyLoc{
 	 NUM_BODYLOCS=13
 }eD2BodyLoc;
 
-typedef enum EInventoryPage{
-	 INVENTORY_PAGE_INVENTORY=0,
-	 INVENTORY_PAGE_TRADE_RECEIVE=1,
-	 INVENTORY_PAGE_TRADE_GIVE=2,
-	 INVENTORY_PAGE_HORADRIC_CUBE=3,
-	 INVENTORY_PAGE_STASH=4,
-	 NUM_INVENTORY_PAGES=5,
-	 INVENTORY_PAGE_NONE=255
-}EInventoryPage;
+typedef enum eInventoryPage{
+	 INVPAGE_Amazon=0,
+	 INVPAGE_Sorceress=1,
+	 INVPAGE_Necromancer=2,
+	 INVPAGE_Paladin=3,
+	 INVPAGE_Barbarian=4,
+	 INVPAGE_Monster=5,
+	 INVPAGE_TradePage1=6,
+	 INVPAGE_TradePage2=7,
+	 INVPAGE_BankPage=8,
+	 INVPAGE_TransmogrifyBox=9,
+	 INVPAGE_GuildVaultPage=10,
+	 INVPAGE_TrophyCasePage=11,
+	 INVPAGE_BigBankPage=12,
+	 INVPAGE_Hireling=13,
+	 INVPAGE_Druid=14,
+	 INVPAGE_Assassin=15,
+	 INVPAGE_None=255
+}eInventoryPage;
 
 typedef enum eD2InventoryGrid{
 	 INVENTORY_GRID_BODYLOC=0,
@@ -1128,6 +1220,10 @@ typedef enum eD2InventoryGridType{
 	 INVENTORY_GRID_TYPE_SWAPPED=4,
 	 NUM_INVENTORY_GRID_TYPES=5
 }eD2InventoryGridType;
+
+typedef enum eD2DynamicPathFlags{
+	 PATH_HASINITCOORDS=131072
+}eD2DynamicPathFlags;
 
 typedef enum eD2PathTypes{
 	 PATHTYPE_IDASTAR=0,
