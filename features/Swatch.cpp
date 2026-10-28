@@ -15,7 +15,7 @@ class : public Feature {
 public:
     void allPostDraw() {
         DWORD fontnum = 8, height, width;
-        D2::SetFont(fontnum);
+        D2::SetAndReturnLastFont(fontnum);
         if (State["drawSwatch"]) {
             wchar_t msg[3] = { 0 };
             int color, gridsize = 24;
@@ -25,8 +25,8 @@ public:
                     DrawRectangle({ x * gridsize, y * gridsize }, { x * gridsize + gridsize, y * gridsize + gridsize }, color);
                     msg[0] = wHex[color >> 4];
                     msg[1] = wHex[color & 15];
-                    height = D2::GetTextSize(msg, &width, &fontnum);
-                    D2::DrawGameText(msg, x * gridsize + (gridsize - width) / 2, (y + 1) * gridsize, 0, 0);
+                    height = D2::TEXT_CalcTextDimensions(msg, &width, &fontnum);
+                    D2::DRAW_text(msg, x * gridsize + (gridsize - width) / 2, (y + 1) * gridsize, 0, 0);
                 }
             }
         }

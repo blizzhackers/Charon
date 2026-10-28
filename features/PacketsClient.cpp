@@ -48,11 +48,11 @@ void __fastcall NET_SID_CLIENT_Send_Hook(INT nPacketId, BYTE* pBytes, size_t nSi
 
 // MCP (SERVER -> CLIENT)
 ASMPTR NET_MCP_CLIENT_IncomingPacketsHandler_Call = 0x449ba9;
-REMOTEFUNC(void __fastcall, NET_MCP_CLIENT_IncomingPacketsHandler, (BYTE* pBytes, size_t nSize), 0x44b190);
+REMOTEFUNC(void __fastcall, HandleIncomingPacket, (BYTE* pBytes, size_t nSize), 0x44b190);
 
 void __fastcall NET_MCP_CLIENT_IncomingPacketsHandler_Replacement(BYTE* pBytes, size_t nSize)
 {
-    NET_MCP_CLIENT_IncomingPacketsHandler(pBytes, nSize);
+    HandleIncomingPacket(pBytes, nSize);
 
     if (Settings["debugPackets"]) {
         gamelog << COLOR(2) << "MCP " << COLOR(4) << "(SERVER -> CLIENT)" << COLOR(0) << " 0x" << std::hex << pBytes[0] << std::dec << " size of " << nSize << std::endl;
@@ -113,7 +113,7 @@ void __fastcall NET_D2GS_CLIENT_PacketHandler_Replacement(BYTE* pBytes, size_t n
 }
 
 // D2GS (CLIENT -> SERVER)
-ASMPTR NET_D2GS_CLIENT_Send_Original = 0x52ae50, NET_D2GS_CLIENT_Send_Rejoin = 0x52ae62;
+ASMPTR NET_D2GS_CLIENT_SendPacketAfterChecks_Original = 0x52ae50, NET_D2GS_CLIENT_Send_Rejoin = 0x52ae62;
 ASMPTR pD2PacketsClientBuffer = 0x882b34;
 
 __declspec(naked) void* __stdcall NET_D2GS_CLIENT_Send_Relocated(size_t nSize, int Unused, BYTE* pBytes) {
@@ -177,7 +177,7 @@ namespace Template {
                 MemoryPatch(NET_MCP_CLIENT_Send_Original) << JUMP(NET_MCP_CLIENT_Send_Hook);
 
                 // D2GS
-                MemoryPatch(NET_D2GS_CLIENT_Send_Original) << JUMP(NET_D2GS_CLIENT_Send_Hook);
+                MemoryPatch(NET_D2GS_CLIENT_SendPacketAfterChecks_Original) << JUMP(NET_D2GS_CLIENT_Send_Hook);
         }
     } feature;
 

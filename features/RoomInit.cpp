@@ -4,7 +4,7 @@
 
 namespace RoomInit {
 
-    ASMPTR RoomInit_Original = 0x542b40, RoomInit_Rejoin = 0x542b46;
+    ASMPTR SUNITINACTIVE_RoomInit_Original = 0x542b40, RoomInit_Rejoin = 0x542b46;
 
     __declspec(naked) void
     __fastcall RoomInit_Relocated(D2::Types::IncompleteGameData *pGame, D2::Types::Room1 *pRoom1) {
@@ -27,7 +27,7 @@ namespace RoomInit {
     class : public Feature {
     public:
         void init() override {
-            MemoryPatch(RoomInit_Original) << JUMP(RoomInit_Hook);
+            MemoryPatch(SUNITINACTIVE_RoomInit_Original) << JUMP(RoomInit_Hook);
         }
     } feature;
 }

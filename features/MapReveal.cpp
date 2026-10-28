@@ -12,12 +12,12 @@
 #include <vector>
 #include <cmath>
 
-REMOTEFUNC(DWORD __stdcall, GetAutomapSize, (void), 0x45A710);
-REMOTEFUNC(D2::Types::AutomapCell* __fastcall, NewAutomapCell, (), 0x457C30);
-REMOTEFUNC(void __fastcall, AddAutomapCell, (D2::Types::AutomapCell* aCell, D2::Types::AutomapCell** node), 0x457B00);
-REMOTEFUNC(void __stdcall, RevealAutomapRoom, (D2::Types::Room1* pRoom1, DWORD dwClipFlag, D2::Types::AutomapLayer* aLayer), 0x458F40);
-REMOTEFUNC(D2::Types::AutomapLayer2* __fastcall, GetLayer, (DWORD dwLevelNo), 0x61E470);
-REMOTEREF(D2::Types::AutomapLayer*, AutomapLayer, 0x7A5164);
+REMOTEFUNC(DWORD __stdcall, AUTOMAP_GetMiniMapType, (void), 0x45A710);
+REMOTEFUNC(D2::Types::AutomapCell* __fastcall, AUTOMAP_AllocCell, (), 0x457C30);
+REMOTEFUNC(void __fastcall, AUTOMAP_InsertCellIntoTree, (D2::Types::AutomapCell* aCell, D2::Types::AutomapCell** node), 0x457B00);
+REMOTEFUNC(void __stdcall, AUTOMAP_RevealRoom, (D2::Types::Room1* pRoom1, DWORD dwClipFlag, D2::Types::AutomapLayer* aLayer), 0x458F40);
+REMOTEFUNC(D2::Types::AutomapLayer2* __fastcall, TXT_LevelDefs_GetLine, (DWORD dwLevelNo), 0x61E470);
+REMOTEREF(D2::Types::AutomapLayer*, sgpAutomapLayerEx, 0x7A5164);
 
 struct RevealData {
     bool isRevealed = false;
@@ -50,11 +50,11 @@ REMOTEFUNC(void __stdcall, D2GFX_DrawSprite6, (D2::Types::DC6Context *pDC6Contex
 void DrawWarpText(DPOINT pos, DWORD levelno, bool isScreen = false) {
     POINT apos = isScreen ? pos.toScreen() : pos.toAutomap();
     DWORD width = 0, height = 0, fontNum = 6;
-    wchar_t* levelNameUnicode = D2::GetLevelText(levelno)->wName;
-    D2::SetFont(fontNum);
-    height = D2::GetTextSize(levelNameUnicode, &width, &fontNum);
+    wchar_t* levelNameUnicode = D2::TXT_Levels_GetLine(levelno)->wName;
+    D2::SetAndReturnLastFont(fontNum);
+    height = D2::TEXT_CalcTextDimensions(levelNameUnicode, &width, &fontNum);
     int offsetx = 8 - ((int)width / 2), offsety = -16;
-    D2::DrawGameText(levelNameUnicode, apos.x + offsetx, apos.y + offsety, 0, false);
+    D2::DRAW_text(levelNameUnicode, apos.x + offsetx, apos.y + offsety, 0, false);
 }
 
 // This feature class registers itself.
@@ -77,7 +77,7 @@ public:
             inGame = true;
         }
 
-        D2::Types::CurrentPlayerUnit* me = D2::PlayerUnit;
+        D2::Types::CurrentPlayerUnit* me = D2::pPlayerUnit;
 
         if (me && me->getLevel()) {
             if (Settings["revealLevel"]) {
@@ -101,7 +101,7 @@ public:
 
     void gameAutomapPostDraw() {
         for (LevelLabel label : levellabels) {
-            if (label.layer == AutomapLayer->nLayerNo) {
+            if (label.layer == sgpAutomapLayerEx->nLayerNo) {
                 DrawWarpText(label.pos, label.level);
             }
         }
@@ -117,13 +117,13 @@ public:
     }
 
     void RevealCurrentLevel() {
-        D2::Types::CurrentPlayerUnit* me = D2::PlayerUnit;
+        D2::Types::CurrentPlayerUnit* me = D2::pPlayerUnit;
         int c = 20;
 
         if (me) for (D2::Types::Level* level = me->pAct->pMisc->pLevelFirst; level != nullptr; level = level->pNextLevel) {
             if (level && level->dwLevelNo > 0) {
-                if (!revealdata[level->dwLevelNo].isRevealed && level->pRoom2First != nullptr && AutomapLayer->nLayerNo == GetLayer(level->dwLevelNo)->nLayerNo) {
-                    revealdata[level->dwLevelNo].layer = AutomapLayer;
+                if (!revealdata[level->dwLevelNo].isRevealed && level->pRoom2First != nullptr && sgpAutomapLayerEx->nLayerNo == TXT_LevelDefs_GetLine(level->dwLevelNo)->nLayerNo) {
+                    revealdata[level->dwLevelNo].layer = sgpAutomapLayerEx;
                     revealdata[level->dwLevelNo].room2 = level->pRoom2First;
                     revealdata[level->dwLevelNo].isRevealed = true;
                 }
@@ -133,7 +133,7 @@ public:
                 for (; c > 0 && room2 != nullptr; c--) {
                     if (room2->pLevel && room2->pLevel->pMisc && room2->pLevel->pMisc->pAct) {
                         if (EnsureRoom(room2)) {
-                            RevealAutomapRoom(room2->pRoom1, TRUE, revealdata[level->dwLevelNo].layer);
+                            AUTOMAP_RevealRoom(room2->pRoom1, TRUE, revealdata[level->dwLevelNo].layer);
                             DrawPresets(room2, revealdata[level->dwLevelNo].layer);
                             // Not sure that we need to unload the room again... we're going to need it again later.
                             // D2::RemoveRoomData(room2->pLevel->pMisc->pAct, room2->pLevel->dwLevelNo, room2->dwPosX, room2->dwPosY, room2->pRoom1);
@@ -148,13 +148,13 @@ public:
 
     // Most of this stuff is based on the d2bs preset unit implementation.
     void GenerateCell(D2::Types::Room2* pRoom2, D2::Types::PresetUnit* pUnit, int mCell, D2::Types::AutomapLayer* layer) {
-        D2::Types::AutomapCell* pCell = NewAutomapCell();
+        D2::Types::AutomapCell* pCell = AUTOMAP_AllocCell();
         pCell->nCellNo = (WORD)mCell;
         int pX = (pUnit->dwPosX + (pRoom2->dwPosX * 5));
         int pY = (pUnit->dwPosY + (pRoom2->dwPosY * 5));
         pCell->xPixel = (WORD)((((pX - pY) * 16) / 10) + 1);
         pCell->yPixel = (WORD)((((pY + pX) * 8) / 10) - 3);
-        AddAutomapCell(pCell, &(layer->pObjects));
+        AUTOMAP_InsertCellIntoTree(pCell, &(layer->pObjects));
     }
 
     void GenerateMegaMarkerCell(D2::Types::Room2* pRoom2, D2::Types::PresetUnit* pUnit, D2::Types::AutomapLayer* layer) {
@@ -174,7 +174,7 @@ public:
     }
 
     void GenerateOwnCell(D2::Types::Room2* pRoom2, D2::Types::PresetUnit* pUnit, D2::Types::AutomapLayer* layer) {
-        D2::Types::ObjectTxt* obj = obj = D2::GetObjectText(pUnit->dwTxtFileNo);
+        D2::Types::ObjectTxt* obj = obj = D2::TXT_Objects_GetLine(pUnit->dwTxtFileNo);
 
         if (obj->nAutoMap > 0) {
             GenerateCell(pRoom2, pUnit, obj->nAutoMap, layer);

@@ -12,16 +12,16 @@
 #include <vector>
 #include <string>
 
-REMOTEREF(int, DrawAutoMapStatsOffsetY, 0x7A51BC);
-REMOTEREF(D2::Types::ItemUnit*, CurrentTooltipItem, 0x7BCBF4);
-REMOTEFUNC(BYTE __stdcall, GetMaxSocketCount, (D2::Types::ItemUnit *pItem), 0x62BC20);
-REMOTEFUNC(int, FUN_0047a560, (), 0x47a560);
+REMOTEREF(int, AUTOMAP_TextHeightOffset, 0x7A51BC);
+REMOTEREF(D2::Types::ItemUnit*, pItemToDescribe, 0x7BCBF4);
+REMOTEFUNC(BYTE __stdcall, ITEM_GetMaxSockCount, (D2::Types::ItemUnit *pItem), 0x62BC20);
+REMOTEFUNC(int, ROSTER_CheckAnyPlayerHostileToMe, (), 0x47a560);
 
 Dialog splashDialog;
 
 void ClearSplash() {
     splashDialog.hide();
-    D2::MainMenuForm();
+    D2::UIMENU_MainMenu();
 }
 
 void SplashScreenDialogSetup() {
@@ -164,12 +164,12 @@ void SplashScreenHook() {
 static DWORD automapTextOffset = 0;
 void _drawAutoMapInfo(DWORD size) {
     DWORD width = 0, height = 0, fileno = 1;
-    height = D2::GetTextSize(L"test", &width, &fileno);
-    DWORD bottom = DrawAutoMapStatsOffsetY - height;
+    height = D2::TEXT_CalcTextDimensions(L"test", &width, &fileno);
+    DWORD bottom = AUTOMAP_TextHeightOffset - height;
     for (AutomapInfoCallback func : AutomapInfoHooks) {
         std::wstring msg = func();
-        bottom += D2::GetTextSize(msg.c_str(), &width, &fileno);
-        D2::DrawGameText(msg.c_str(), D2::ScreenWidth - 16 - width, bottom, 4, 0);
+        bottom += D2::TEXT_CalcTextDimensions(msg.c_str(), &width, &fileno);
+        D2::DRAW_text(msg.c_str(), D2::ScreenWidth - 16 - width, bottom, 4, 0);
     }
     automapTextOffset = bottom;
 }
@@ -177,8 +177,8 @@ void _drawAutoMapInfo(DWORD size) {
 void __fastcall DrawRepairImageAlertIntercept(void *pImage, bool isArrow) {
     int x = D2::ScreenWidth - (isArrow ? 0x38 : 0x3C), y = 0;
 
-    if (D2::GetUiFlag(0xA)) {
-        y = (FUN_0047a560() ? 0x2B : 0) + DrawAutoMapStatsOffsetY + automapTextOffset;
+    if (D2::GetUIFlag(0xA)) {
+        y = (ROSTER_CheckAnyPlayerHostileToMe() ? 0x2B : 0) + AUTOMAP_TextHeightOffset + automapTextOffset;
     }
     else {
         y = 0x6E;
@@ -188,7 +188,7 @@ void __fastcall DrawRepairImageAlertIntercept(void *pImage, bool isArrow) {
         y += 0x2D;
     }
 
-    D2::DrawImage(pImage, x, y, -1, isArrow ? 5 : 1, nullptr);
+    D2::D2GFX_DrawImage(pImage, x, y, -1, isArrow ? 5 : 1, nullptr);
 }
 
 ASMPTR GetItemName_Original = 0x48C060;
@@ -205,7 +205,7 @@ __declspec(naked) BOOL __fastcall GetItemName_Relocated(D2::Types::ItemUnit* ite
 
 BOOL __fastcall GetItemName_Intercept(D2::Types::ItemUnit* item, wchar_t* wBuffer, DWORD dwSize) {
     BOOL ret = GetItemName_Relocated(item, wBuffer, dwSize);
-    DWORD sockets = D2::GetUnitStat(item, 194, 0);
+    DWORD sockets = D2::STATSEX_GetCurrentStat(item, 194, 0);
 
     if (sockets > 0) {
         wchar_t *tmpBuffer = new wchar_t[dwSize], *a = wBuffer;
@@ -231,34 +231,34 @@ BOOL __fastcall GetItemName_Intercept(D2::Types::ItemUnit* item, wchar_t* wBuffe
 void __fastcall GetItemDescription(wchar_t* wBuffer) {
     const size_t dwSize = 1024;
 
-    if (Settings["itemInfo"] && CurrentTooltipItem->pItemData->dwItemLevel > 1) {
+    if (Settings["itemInfo"] && pItemToDescribe->pItemData->dwItemLevel > 1) {
         wchar_t tmpBuffer[dwSize];
-        if (D2::GetUnitStat(CurrentTooltipItem, 194, 0) < 1 && CurrentTooltipItem->pItemData->dwQuality < 4) {
-            BYTE maxSockets = GetMaxSocketCount(CurrentTooltipItem);
+        if (D2::STATSEX_GetCurrentStat(pItemToDescribe, 194, 0) < 1 && pItemToDescribe->pItemData->dwQuality < 4) {
+            BYTE maxSockets = ITEM_GetMaxSockCount(pItemToDescribe);
             if (maxSockets > 0) {
-                swprintf(tmpBuffer, 1024, L"\u00FFc5Max Sockets: %d\nItem Level: %d\n%ls", maxSockets, CurrentTooltipItem->pItemData->dwItemLevel, wBuffer);
+                swprintf(tmpBuffer, 1024, L"\u00FFc5Max Sockets: %d\nItem Level: %d\n%ls", maxSockets, pItemToDescribe->pItemData->dwItemLevel, wBuffer);
                 wcscpy_s(wBuffer, dwSize, tmpBuffer);
                 return;
             }
         }
 
-        swprintf(tmpBuffer, 1024, L"\u00FFc5Item Level: %d\n%ls", CurrentTooltipItem->pItemData->dwItemLevel, wBuffer);
+        swprintf(tmpBuffer, 1024, L"\u00FFc5Item Level: %d\n%ls", pItemToDescribe->pItemData->dwItemLevel, wBuffer);
         wcscpy_s(wBuffer, dwSize, tmpBuffer);
     }
 }
 
 ASMPTR ItemDescription_Patches[] = { 0x48ED2F, 0x48E39C, 0x48DB1D };
-REMOTEFUNC(void __fastcall, CalcTextDimensions, (wchar_t* wBuffer, long* x, long* y), 0x502520);
+REMOTEFUNC(void __fastcall, TEXT_CalcTextDimensions, (wchar_t* wBuffer, long* x, long* y), 0x502520);
 
 void __fastcall ItemDescription_Hook(wchar_t* wBuffer, long *x, long *y) {
     GetItemDescription(wBuffer);
-    CalcTextDimensions(wBuffer, x, y);
+    TEXT_CalcTextDimensions(wBuffer, x, y);
 }
 
 [[maybe_unused]] int
 __fastcall setItemColor(D2::Types::UnitAny *item, WCHAR *buffer, int nColor) {
     if (Settings["itemInfo"]) {
-        D2::Types::ItemTxt *itemText = D2::GetItemText(item->dwTxtFileNo);
+        D2::Types::ItemTxt *itemText = D2::TXT_Items_GetLine(item->dwTxtFileNo);
         if (itemText->nType == 78) {
             nColor = 11;
         }
@@ -268,7 +268,7 @@ __fastcall setItemColor(D2::Types::UnitAny *item, WCHAR *buffer, int nColor) {
 
 __declspec(naked) void ItemColor_Hook() {
     static ASMPTR jmpBack = 0x452929;
-    static ASMPTR ITEM_GetTypeFromTxtTable = 0x62b400;
+    static ASMPTR ITEM_GetItemData_wType = 0x62b400;
     __asm {
         mov ecx, esi              // Argument 1, item
                                   // argument 2, buffer (already in edx
@@ -277,7 +277,7 @@ __declspec(naked) void ItemColor_Hook() {
         mov    DWORD PTR[ebp-0x4], eax // actual color is set @ setItemColor
 
         // Original code
-        call ITEM_GetTypeFromTxtTable;
+        call ITEM_GetItemData_wType;
         JMP jmpBack;
     }
 }
@@ -356,7 +356,7 @@ __declspec(naked) void __stdcall GetGlobalLight_Original(void* pAct, BYTE* red, 
 // Can this be even more specific? Maybe D2::Types::NonPlayerUnit?
 wchar_t* __fastcall UnitVisualname(D2::Types::LivingUnit *pUnit) {
     // For now it falls under item info, as it is as item/unit level
-    if (!Settings["itemInfo"]) return D2::GetUnitName(pUnit);
+    if (!Settings["itemInfo"]) return D2::GetName(pUnit);
 
     const size_t dwSize = 1024;
     // Since it returns directly to an append function we just need one static
@@ -364,7 +364,7 @@ wchar_t* __fastcall UnitVisualname(D2::Types::LivingUnit *pUnit) {
     // preserved. Also Visual Studio complains about returning a temporary variable.
     static wchar_t tmpBuffer[dwSize];
 
-    swprintf(tmpBuffer, dwSize, L"%ls (%d)", D2::GetUnitName(pUnit), D2::GetUnitStat(pUnit, 12/*level*/, 0));
+    swprintf(tmpBuffer, dwSize, L"%ls (%d)", D2::GetName(pUnit), D2::STATSEX_GetCurrentStat(pUnit, 12/*level*/, 0));
     return tmpBuffer;
 }
 
@@ -438,8 +438,8 @@ public:
 
     void oogPostDraw() {
         DWORD width = 0, height = 0, fileno = 1;
-        height = D2::GetTextSize(version.c_str(), &width, &fileno);
-        D2::DrawGameText(version.c_str(), D2::ScreenWidth - width - 5, D2::ScreenHeight - 5, 4, 0);
+        height = D2::TEXT_CalcTextDimensions(version.c_str(), &width, &fileno);
+        D2::DRAW_text(version.c_str(), D2::ScreenWidth - width - 5, D2::ScreenHeight - 5, 4, 0);
     }
 
     bool keyEvent(DWORD keyCode, bool down, DWORD flags) {

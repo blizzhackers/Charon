@@ -32,10 +32,10 @@ enum class eD2ServerIncomingStatus {
 };
 
 // These are protected locations, so you need to use MemoryPatch to change them
-REMOTEPTR(ServerIncomingD2GSPacketEntry, ServerIncomingD2GSPacketTable, 0x6e0d18)
-REMOTEPTR(ClientIncomingD2GSPacketEntry, ClientIncomingD2GSPacketTable, 0x7114d0)
-REMOTEPTR(long, ClientIncomingD2GSPacketSizeTable, 0x730ae8)
-REMOTEPTR(long, ClientOutgoingD2GSPacketSizeTable, 0x730dc0)
+REMOTEPTR(ServerIncomingD2GSPacketEntry, NET_D2GS_SERVER_INCOMING, 0x6e0d18)
+REMOTEPTR(ClientIncomingD2GSPacketEntry, NET_D2GS_CLIENT_INCOMING, 0x7114d0)
+REMOTEPTR(long, NET_D2GS_CLIENT_INCOMING_SIZE, 0x730ae8)
+REMOTEPTR(long, NET_D2GS_CLIENT_OUTGOING_SIZE, 0x730dc0)
 
 void __fastcall ServerIncomingPacketHook_InGame (char* pBytes, int nSize) {
     CustomPacketHeader* header = (CustomPacketHeader*)(pBytes + 4);
@@ -65,20 +65,20 @@ void __fastcall ClientIncomingPacketHook_InGame(char* pBytes, int nSize) {
 }
 
 void SetClientPacketHandler(char packetId, long size, void* handler = nullptr, void* unitHandler = nullptr) {
-    MemoryPatch((DWORD)&ClientIncomingD2GSPacketTable[packetId]) << DATA(ClientIncomingD2GSPacketEntry{
+    MemoryPatch((DWORD)&NET_D2GS_CLIENT_INCOMING[packetId]) << DATA(ClientIncomingD2GSPacketEntry{
         handler,
         size,
         unitHandler,
     });
-    MemoryPatch((DWORD)&ClientIncomingD2GSPacketSizeTable[packetId]) << size;
+    MemoryPatch((DWORD)&NET_D2GS_CLIENT_INCOMING_SIZE[packetId]) << size;
 }
 
 void SetServerPacketHandler(char packetId, long size, void* handler = nullptr) {
-    MemoryPatch((DWORD)&ServerIncomingD2GSPacketTable[packetId]) << DATA(ServerIncomingD2GSPacketEntry{
+    MemoryPatch((DWORD)&NET_D2GS_SERVER_INCOMING[packetId]) << DATA(ServerIncomingD2GSPacketEntry{
         handler,
         1,
     });
-    MemoryPatch((DWORD)&ClientOutgoingD2GSPacketSizeTable[packetId]) << size;
+    MemoryPatch((DWORD)&NET_D2GS_CLIENT_OUTGOING_SIZE[packetId]) << size;
 }
 
 const ASMPTR NET_D2GS_CLIENT_GetIncomingPacketSizeFromTableAndVariableSize_Original = 0x52b920, NET_D2GS_CLIENT_GetIncomingPacketSizeFromTableAndVariableSize_Rejoin = 0x52b926;

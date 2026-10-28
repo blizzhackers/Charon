@@ -12,12 +12,12 @@
 const wchar_t* align[] = { L"Hostile", L"Neutral", L"Friendly" };
 const DWORD alignColors[] = { 1, 5, 2 };
 
-ASMPTR EnableDebugPrint = 0x8846DC;
-REMOTEFUNC(void __fastcall, DrawFloor, (void* unknown), 0x4DED10);
+ASMPTR DEBUGPRINT = 0x8846DC;
+REMOTEFUNC(void __fastcall, dFloorDraw, (void* unknown), 0x4DED10);
 
 void __fastcall _drawFloor(void* unknown) {
     if (!Settings["debugMode"]) {
-        DrawFloor(unknown);
+        dFloorDraw(unknown);
     }
 }
 
@@ -36,7 +36,7 @@ int __stdcall printf_newline(const char* format, ...) {
     return done;
 }
 
-REMOTEFUNC(void __fastcall, DRAW_UnderFloor, (void* param1), 0x4df480)
+REMOTEFUNC(void __fastcall, DRAW_WORLD_UnderFloor, (void* param1), 0x4df480)
 void __fastcall DRAW_UnderFloor_Intercept(void* param1) {
 
     // ToDo; only visiable background behind floor is in baals chamber, as it has some floating floors
@@ -44,7 +44,7 @@ void __fastcall DRAW_UnderFloor_Intercept(void* param1) {
     // Should only draw when in chamber, and disable for the rest of the levels. Waste of resource
 
     if (!Settings["debugMode"]) {
-        DRAW_UnderFloor(param1);
+        DRAW_WORLD_UnderFloor(param1);
     }
 }
 
@@ -128,7 +128,7 @@ _declspec(naked) void DrawWalls_intercept() {
 }
 
 __declspec(naked) void DrawShadows_intercept() {
-    static const ASMPTR DrawShadows_original = 0x4df510;
+    static const ASMPTR dShadowPass_original = 0x4df510;
     __asm {
         pushad
         call CanDrawShadows
@@ -136,7 +136,7 @@ __declspec(naked) void DrawShadows_intercept() {
         popad
         jz skip
 
-        jmp DrawShadows_original
+        jmp dShadowPass_original
 
         skip:
         ret
@@ -144,7 +144,7 @@ __declspec(naked) void DrawShadows_intercept() {
 }
 
 __declspec(naked) void DrawRoofs_intercept() {
-    static const ASMPTR DrawRoofs_original = 0x4dea70;
+    static const ASMPTR dRoofDraw_original = 0x4dea70;
     __asm {
         pushad
         call CanDrawRoofs
@@ -152,7 +152,7 @@ __declspec(naked) void DrawRoofs_intercept() {
         popad
         jz skip
 
-        jmp DrawRoofs_original
+        jmp dRoofDraw_original
 
         skip :
         ret
@@ -198,7 +198,7 @@ namespace DebugMode {
 
         void gameUnitPreDraw() {
             if (Settings["debugMode"]) {
-                D2::Types::Room1* current = D2::PlayerUnit->getRoom1();
+                D2::Types::Room1* current = D2::pPlayerUnit->getRoom1();
                 D2::Types::CollMap* coll = current->Coll;
                 WORD* p = coll->pMapStart;
                 DWORD color, x, y;
@@ -222,7 +222,7 @@ namespace DebugMode {
                 }
 
                 // Server side tracks enemies
-                for (D2::Types::NonPlayerUnit* unit : D2::ServerSideUnits.nonplayers.all()) {
+                for (D2::Types::NonPlayerUnit* unit : D2::ServerSideUnitHashTables.nonplayers.all()) {
                     if (unit->pPath && unit->unitHP() > 0) {
                         POINT pos = unit->pos().toScreen(), target = unit->getTargetPos().toScreen();
 
@@ -233,7 +233,7 @@ namespace DebugMode {
                 }
 
                 // Client side tracks missiles
-                for (D2::Types::MissileUnit* unit : D2::ClientSideUnits.missiles.all()) {
+                for (D2::Types::MissileUnit* unit : D2::ClientSideUnitHashTables.missiles.all()) {
                     unit->DrawWorldX(0x99, 0.5);
                     POINT pos = unit->pos().toScreen(), target = unit->getTargetPos().toScreen();
 
@@ -249,27 +249,27 @@ namespace DebugMode {
                 wchar_t msg[512];
                 DWORD fontNum = 12, width = 0, height = 0;
                 POINT pos;
-                D2::SetFont(fontNum);
+                D2::SetAndReturnLastFont(fontNum);
 
-                for (D2::Types::PlayerUnit* unit : D2::ServerSideUnits.players.all()) {
+                for (D2::Types::PlayerUnit* unit : D2::ServerSideUnitHashTables.players.all()) {
                     unit->DrawWorldX(0x9B);
                 }
 
                 // Server side tracks objects
-                for (D2::Types::ObjectUnit* unit : D2::ServerSideUnits.objects.all()) {
+                for (D2::Types::ObjectUnit* unit : D2::ServerSideUnitHashTables.objects.all()) {
                     DPOINT dpos = unit->pos();
                     dpos.DrawWorldX(0x69);
                     pos = dpos.toScreen();
                     swprintf_s(msg, L"%d", unit->dwTxtFileNo);
-                    height = D2::GetTextSize(msg, &width, &fontNum);
-                    D2::DrawGameText(msg, pos.x - (width >> 1) - 4, pos.y - height + 8, 8, 1);
+                    height = D2::TEXT_CalcTextDimensions(msg, &width, &fontNum);
+                    D2::DRAW_text(msg, pos.x - (width >> 1) - 4, pos.y - height + 8, 8, 1);
                 }
 
                 // Server side tracks enemies
-                for (D2::Types::NonPlayerUnit* unit : D2::ServerSideUnits.nonplayers.all()) {
+                for (D2::Types::NonPlayerUnit* unit : D2::ServerSideUnitHashTables.nonplayers.all()) {
                     if (unit->pPath) {
                         if (unit->isAttackable()) {
-                            switch (D2::GetUnitStat(unit, 172, 0)) {
+                            switch (D2::STATSEX_GetCurrentStat(unit, 172, 0)) {
                             case 0: // hostile
                                 if (unit->pMonsterData->fUnique || unit->pMonsterData->fChamp) {
                                     unit->DrawWorldX(0x0C);
@@ -296,27 +296,27 @@ namespace DebugMode {
 
                         if (pos.x >= 0 && pos.y >= 0 && pos.x < D2::ScreenWidth && pos.y < D2::ScreenHeight) {
                             swprintf_s(msg, L"%d", unit->dwTxtFileNo);
-                            height = D2::GetTextSize(msg, &width, &fontNum);
-                            D2::DrawGameText(msg, pos.x - (width >> 1), pos.y + height + 2, alignColors[D2::GetUnitStat(unit, 172, 0)], 0);
+                            height = D2::TEXT_CalcTextDimensions(msg, &width, &fontNum);
+                            D2::DRAW_text(msg, pos.x - (width >> 1), pos.y + height + 2, alignColors[D2::STATSEX_GetCurrentStat(unit, 172, 0)], 0);
 
                             if (unit->pMonsterData->fSuper) {
                                 swprintf_s(msg, L"%d", unit->pMonsterData->wUniqueNo);
-                                height = D2::GetTextSize(msg, &width, &fontNum);
-                                D2::DrawGameText(msg, pos.x + 8, pos.y + 5, 3, 0);
+                                height = D2::TEXT_CalcTextDimensions(msg, &width, &fontNum);
+                                D2::DRAW_text(msg, pos.x + 8, pos.y + 5, 3, 0);
                             }
                         }
                     }
                 }
 
-                if (D2::PlayerUnit->getLevel() != nullptr) {
-                    for (D2::Types::Room2* room : D2::PlayerUnit->getLevel()->getAllRoom2()) {
+                if (D2::pPlayerUnit->getLevel() != nullptr) {
+                    for (D2::Types::Room2* room : D2::pPlayerUnit->getLevel()->getAllRoom2()) {
                         for (D2::Types::PresetUnit* unit : room->getAllPresetUnits()) {
                             DPOINT dpos = unit->pos(room);
                             dpos.DrawWorldX(0x84);
                             POINT wpos = dpos.toScreen();
                             swprintf_s(msg, L"%d", unit->dwTxtFileNo);
-                            height = D2::GetTextSize(msg, &width, &fontNum);
-                            D2::DrawGameText(msg, wpos.x - (width >> 1) - 4, wpos.y + height + 2, 2, 1);
+                            height = D2::TEXT_CalcTextDimensions(msg, &width, &fontNum);
+                            D2::DRAW_text(msg, wpos.x - (width >> 1) - 4, wpos.y + height + 2, 2, 1);
                         }
                     }
                 }

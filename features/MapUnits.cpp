@@ -20,7 +20,7 @@ public:
     void gameAutomapPostDraw() {
         if (Settings["showMissiles"]) {
             // Client side tracks missiles
-            for (D2::Types::MissileUnit* unit : D2::ClientSideUnits.missiles.all()) {
+            for (D2::Types::MissileUnit* unit : D2::ClientSideUnitHashTables.missiles.all()) {
                 unit->DrawAutomapDot(0x99);
             }
         }
@@ -28,12 +28,12 @@ public:
         if (Settings["debugMode"]) {
 
             // Server side tracks objects
-            for (D2::Types::ObjectUnit* unit : D2::ServerSideUnits.objects.all()) {
+            for (D2::Types::ObjectUnit* unit : D2::ServerSideUnitHashTables.objects.all()) {
                 unit->DrawAutomapDot(0x69);
             }
 
-            if (D2::PlayerUnit->getLevel() != nullptr) {
-                for (D2::Types::Room2* room : D2::PlayerUnit->getLevel()->getAllRoom2()) {
+            if (D2::pPlayerUnit->getLevel() != nullptr) {
+                for (D2::Types::Room2* room : D2::pPlayerUnit->getLevel()->getAllRoom2()) {
                     for (D2::Types::PresetUnit* unit : room->getAllPresetUnits()) {
                         unit->pos(room).DrawAutomapDot(0x84);
                     }
@@ -43,16 +43,16 @@ public:
 
         if (Settings["showItems"]) {
             // Server side tracks items
-            for (D2::Types::ItemUnit* unit : D2::ServerSideUnits.items.all()) {
+            for (D2::Types::ItemUnit* unit : D2::ServerSideUnitHashTables.items.all()) {
                 if (unit->dwMode == 3 || unit->dwMode == 5) {
                     if (unit->pItemData->dwFlags & 0x4000000) {
                         unit->DrawAutomapX(ItemRarityColor[7], 3);
                     }
-                    else if (unit->pItemData->dwQuality > 3 || (unit->pItemData->dwFlags & 0x400800 && unit->pItemData->dwQuality > 2 && D2::GetUnitStat(unit, 194, 0) >= 2)) { // @todo check number of sockets
+                    else if (unit->pItemData->dwQuality > 3 || (unit->pItemData->dwFlags & 0x400800 && unit->pItemData->dwQuality > 2 && D2::STATSEX_GetCurrentStat(unit, 194, 0) >= 2)) { // @todo check number of sockets
                         unit->DrawAutomapX(ItemRarityColor[unit->pItemData->dwQuality], 3);
                     }
                     else {
-                        D2::Types::ItemTxt* txt = D2::GetItemText(unit->dwTxtFileNo);
+                        D2::Types::ItemTxt* txt = D2::TXT_Items_GetLine(unit->dwTxtFileNo);
                         if (txt->nType >= 96 && txt->nType <= 102 || txt->nType == 74) {
                             unit->DrawAutomapX(169, 3);
                         }
@@ -63,7 +63,7 @@ public:
 
         if (Settings["showMonsters"]) {
             // Server side tracks enemies
-            for (D2::Types::NonPlayerUnit* unit : D2::ServerSideUnits.nonplayers.all()) {
+            for (D2::Types::NonPlayerUnit* unit : D2::ServerSideUnitHashTables.nonplayers.all()) {
                 if (unit->isPlayerHostile() && unit->unitHP() > 0) {
                     if (unit->isAttackable()) {
                         if (unit->pMonsterData->fUnique || unit->pMonsterData->fChamp) {

@@ -9,7 +9,7 @@
 #include <string>
 #include <cmath>
 
-REMOTEFUNC(void __stdcall, SetupFramesPerSecond, (int32_t param_1), 0x52df80);
+REMOTEFUNC(void __stdcall, GAME_SetFrameRate, (int32_t param_1), 0x52df80);
 
 wchar_t settingsPath[512] = { 0 };
 
@@ -396,7 +396,7 @@ std::vector<std::vector<DialogToggleInfo*>> SettingsColumns = {
                     Settings["TargetFPS"] -= 5;
                 }
 
-                SetupFramesPerSecond(Settings["TargetFPS"]);
+                GAME_SetFrameRate(Settings["TargetFPS"]);
 
                 SaveSettings();
             }),
@@ -411,7 +411,7 @@ namespace SettingsFeature {
     }
 
     int __declspec(naked) pauseGameIntercept() {
-        const static ASMPTR GetUiFlagWrapper = 0x453a90;
+        const static ASMPTR UI_GetFlag = 0x453a90;
         const static ASMPTR Continue = 0x44efed;
         const static ASMPTR PauseGame = 0x44f00a;
         __asm {
@@ -425,7 +425,7 @@ namespace SettingsFeature {
             original:
                 // Original code
                 MOV     ECX, 0x9
-                CALL    GetUiFlagWrapper    // eax = GetUiFlagWrapper(9)
+                CALL    UI_GetFlag    // eax = UI_GetFlag(9)
                 JMP     Continue;
 
 
@@ -490,7 +490,7 @@ namespace SettingsFeature {
                 x += width;
             }
 
-            D2::NoPickUp = Settings["noPickup"];
+            D2::gbSuppressItemSelection = Settings["noPickup"];
 
             if (!Settings["TargetFPS"]) {
                 Settings["TargetFPS"] = 25;
@@ -500,7 +500,7 @@ namespace SettingsFeature {
                 Settings["sojSaleTime"] = 150;
             }
 
-            SetupFramesPerSecond(Settings["TargetFPS"]);
+            GAME_SetFrameRate(Settings["TargetFPS"]);
 
             // Pause the game like with the normal esc menu
             MemoryPatch(0x44efe3) << JUMP(pauseGameIntercept);

@@ -8,7 +8,7 @@ Ghidra::D2UnitStrc* pLastVictim;
 
 REMOTEREF(DWORD, PlayerCountOverride, 0x883d70);
 REMOTEFUNC(DWORD __fastcall, CALC_Experience, (Ghidra::D2UnitStrc* pUnit, int dummy, Ghidra::D2GameStrc* pGame, unsigned int param_3), 0x57e3f0)
-REMOTEFUNC(Ghidra::D2ClientStrc* __stdcall, PLAYER_GetClientFromUnitData, (Ghidra::D2UnitStrc* pUnit), 0x5531c0)
+REMOTEFUNC(Ghidra::D2ClientStrc* __stdcall, SUNIT_GetClient, (Ghidra::D2UnitStrc* pUnit), 0x5531c0)
 REMOTEFUNC(void __fastcall, SERVER_KillExperience, (Ghidra::D2GameStrc* pGame, Ghidra::D2UnitStrc* pAttacker, Ghidra::D2UnitStrc* pVictim), 0x57e990)
 
 void __fastcall SERVER_KillExperience_intercept(Ghidra::D2GameStrc* pGame, Ghidra::D2UnitStrc* pAttacker, Ghidra::D2UnitStrc* pVictim) {
@@ -76,7 +76,7 @@ namespace ExperienceMod {
 
         void serverExpAward(DWORD exp, Ghidra::D2UnitStrc* pUnit, Ghidra::D2GameStrc* pGame) {
             if (pUnit->eUnitType == Ghidra::UNIT_PLAYER && Settings["infoPopups"]) {
-                Ghidra::D2ClientStrc* pClient = PLAYER_GetClientFromUnitData(pUnit);
+                Ghidra::D2ClientStrc* pClient = SUNIT_GetClient(pUnit);
 
                 if (pClient != nullptr) {
                     FlyingTextPacket packet;

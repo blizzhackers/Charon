@@ -15,8 +15,8 @@ const DWORD SuccessfulCommandAddress = 0x47ca4f;
 WNDPROC OldWndProc;
 
 BOOL keyPressEvent(WPARAM wparam, LPARAM lparam) {
-    BOOL chatBox = D2::GetUiFlag(0x05);
-    BOOL escMenu = D2::GetUiFlag(0x09);
+    BOOL chatBox = D2::GetUIFlag(0x05);
+    BOOL escMenu = D2::GetUIFlag(0x09);
 
     //gamelog << COLOR(4) << "chatbox: " << chatBox << "\t" << "escMenu: " << escMenu << "\t" << wparam <<"\t" << lparam << std::endl;
 

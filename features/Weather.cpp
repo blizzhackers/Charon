@@ -8,12 +8,12 @@
 #include "headers/hook.h"
 #include "headers/remote.h"
 
-REMOTEFUNC(void, DrawWeather, (), 0x473910);
+REMOTEFUNC(void, DRAW_Overlay_Weather, (), 0x473910);
 
 namespace Weather {
 
     void drawWeatherIntercept() {
-        if (!Settings["disableWeather"] && !Settings["debugMode"]) DrawWeather();
+        if (!Settings["disableWeather"] && !Settings["debugMode"]) DRAW_Overlay_Weather();
     }
 
     class : public Feature {

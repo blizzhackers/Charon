@@ -6,12 +6,12 @@
 #include <cstdlib>
 
 REMOTEREF(BOOL, D2Ini_bUseDirect, 0x74c82c);
-REMOTEFUNC(DWORD __fastcall, LoadMPQ, (const char* szMpqFileName, int nZero, DWORD fpRequiredUserAction, int nTimeTBC), 0x517332);
+REMOTEFUNC(DWORD __fastcall, ARCHIVE_LoadMPQ, (const char* szMpqFileName, int nZero, DWORD fpRequiredUserAction, int nTimeTBC), 0x517332);
 
 BOOL GetUseDirect(void) {
     for (Feature* f = Features; f; f = f->next) {
         for (std::string mpqname : f->mpq) {
-            if (LoadMPQ(mpqname.c_str(), 0, 0, 5000)) {
+            if (ARCHIVE_LoadMPQ(mpqname.c_str(), 0, 0, 5000)) {
                 gamelog << "Using MPQ: " << mpqname.c_str() << std::endl;
             }
             else {

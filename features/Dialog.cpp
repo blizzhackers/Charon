@@ -90,16 +90,16 @@ void Element::drawFrame(int ox, int oy) {
     if (!visible) return;
 
     if (backgroundColor >= 0 && backgroundOpacity > 0) {
-        D2::DrawSolidRectAlpha(ox + pos.left, oy + pos.top, ox + pos.right, oy + pos.bottom, backgroundColor, backgroundOpacity);
+        D2::D2GFX_DrawSolidRectAlpha(ox + pos.left, oy + pos.top, ox + pos.right, oy + pos.bottom, backgroundColor, backgroundOpacity);
     }
 
     if (borderColor >= 0) {
         RECT b = { ox + pos.left, oy + pos.top, ox + pos.right, oy + pos.bottom };
-        D2::DrawRect(&b, (BYTE)borderColor);
+        D2::D2GFX_DrawRectEx(&b, (BYTE)borderColor);
     }
 
     for (LineInfo line : (drawLinesCallback ? drawLinesCallback(lines) : lines)) {
-        D2::DrawLine(ox + pos.left + line.a.x, oy + pos.top + line.a.y, ox + pos.left + line.b.x, oy + pos.top + line.b.y, line.color, line.opacity);
+        D2::D2GFX_DrawLine(ox + pos.left + line.a.x, oy + pos.top + line.a.y, ox + pos.left + line.b.x, oy + pos.top + line.b.y, line.color, line.opacity);
     }
 }
 
@@ -188,19 +188,19 @@ void TextElement::draw(int ox, int oy) {
 
     DWORD fileno = font, w = 0, h = 0;
     std::wstring message = textCallback();
-    D2::SetFont(fileno);
-    h = D2::GetTextSize(message.c_str(), &w, &fileno);
+    D2::SetAndReturnLastFont(fileno);
+    h = D2::TEXT_CalcTextDimensions(message.c_str(), &w, &fileno);
     int cy = (pos.top + pos.bottom + h) / 2;
 
     switch (orientation) {
     case Orientation::RIGHT:
-        D2::DrawGameText(message.c_str(), ox + textOffsetX + pos.right - w, oy + textOffsetY + cy, color, 0);
+        D2::DRAW_text(message.c_str(), ox + textOffsetX + pos.right - w, oy + textOffsetY + cy, color, 0);
         break;
     case Orientation::CENTER:
-        D2::DrawGameText(message.c_str(), ox + textOffsetX + (pos.left + pos.right - w) / 2, oy + textOffsetY + cy, color, 0);
+        D2::DRAW_text(message.c_str(), ox + textOffsetX + (pos.left + pos.right - w) / 2, oy + textOffsetY + cy, color, 0);
         break;
     default:
-        D2::DrawGameText(message.c_str(), ox + textOffsetX + pos.left, oy + textOffsetY + cy, color, 0);
+        D2::DRAW_text(message.c_str(), ox + textOffsetX + pos.left, oy + textOffsetY + cy, color, 0);
         break;
     }
 

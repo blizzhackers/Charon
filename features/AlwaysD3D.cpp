@@ -7,22 +7,22 @@
 #include <chrono>
 #include <thread>
 
-REMOTEREF(DWORD, InternalWidth, 0x7c9138);
-REMOTEREF(DWORD, InternalHeight, 0x7c913c);
-REMOTEREF(DWORD, ScreenWidth, 0x71146c);
-REMOTEREF(DWORD, ScreenHeight, 0x711470);
-REMOTEREF(DWORD, ScreenMode, 0x7a5218);
-REMOTEREF(DWORD, Dunno, 0x7a2858);
-REMOTEREF(BOOL, FixAspect, 0x72da7c);
-REMOTEREF(LPDIRECTDRAW7, IDirectDraw, 0x970e60);
-REMOTEREF(LPDIRECT3D3, IDirect3D, 0x970e64);
-REMOTEREF(LPDIRECTDRAWSURFACE7, D3DSurfacePrimary, 0x970e68);
+REMOTEREF(DWORD, RENDERER_nWindowWidth, 0x7c9138);
+REMOTEREF(DWORD, RENDERER_nWindowHeight, 0x7c913c);
+REMOTEREF(DWORD, ScreenSizeX, 0x71146c);
+REMOTEREF(DWORD, ScreenSizeY, 0x711470);
+REMOTEREF(DWORD, nScreenMode, 0x7a5218);
+REMOTEREF(DWORD, gnPanelOffsetX, 0x7a2858);
+REMOTEREF(BOOL, bAspect, 0x72da7c);
+REMOTEREF(LPDIRECTDRAW7, g_pDirectDraw7, 0x970e60);
+REMOTEREF(LPDIRECT3D3, g_pDirect3D7, 0x970e64);
+REMOTEREF(LPDIRECTDRAWSURFACE7, g_pD3DSurfaceBackbuffer, 0x970e68);
 REMOTEREF(LPDIRECTDRAWSURFACE7, D3DSurfaceSecondary, 0x970e6c);
-REMOTEREF(LPDIRECT3DDEVICE3, Direct3DDevice, 0x970e78);
-REMOTEREF(LPDIRECT3DVIEWPORT3, Direct3DViewport, 0x970e7c);
-REMOTEREF(DWORD, GameType, 0x7a0610);
-REMOTEPTR(DWORD, unknownInBeginScene, 0x970e54);
-REMOTEFUNC(void, D3D_DirectDrawPostSetup, (), 0x6b8f10);
+REMOTEREF(LPDIRECT3DDEVICE3, g_pD3DDevice, 0x970e78);
+REMOTEREF(LPDIRECT3DVIEWPORT3, g_pD3DViewport, 0x970e7c);
+REMOTEREF(DWORD, eD2GSGameType_007a0610, 0x7a0610);
+REMOTEPTR(DWORD, g_nCurrentTextureOpMode, 0x970e54);
+REMOTEFUNC(void, RENDERER_D3D_InitGroundTileCache, (), 0x6b8f10);
 
 LPDIRECTDRAWSURFACE7 D3DSurfaceBackground = nullptr;
 bool bD3DFull = false;
@@ -31,49 +31,49 @@ DWORD dwOldStyle = 0;
 DWORD dwOldStyleEx = 0;
 
 void D3D_DirectDrawScreenSetup() {
-    InternalWidth = 800;
-    InternalHeight = 600;
-    IDirectDraw->SetCooperativeLevel(D2::hWnd, DDSCL_NORMAL | DDSCL_NOWINDOWCHANGES);
+    RENDERER_nWindowWidth = 800;
+    RENDERER_nWindowHeight = 600;
+    g_pDirectDraw7->SetCooperativeLevel(D2::hwndD2GFX_Window, DDSCL_NORMAL | DDSCL_NOWINDOWCHANGES);
     if (!dwOldStyle) {
-        dwOldStyle = GetWindowLong(D2::hWnd, GWL_STYLE);
-        dwOldStyleEx = GetWindowLong(D2::hWnd, GWL_EXSTYLE);
+        dwOldStyle = GetWindowLong(D2::hwndD2GFX_Window, GWL_STYLE);
+        dwOldStyleEx = GetWindowLong(D2::hwndD2GFX_Window, GWL_EXSTYLE);
         dwOldStyle &= ~(WS_MAXIMIZEBOX);
         dwOldStyle &= ~(WS_EX_TOPMOST);
-        SetWindowLong(D2::hWnd, GWL_STYLE, dwOldStyle);
-        SetWindowLong(D2::hWnd, GWL_EXSTYLE, dwOldStyleEx);
+        SetWindowLong(D2::hwndD2GFX_Window, GWL_STYLE, dwOldStyle);
+        SetWindowLong(D2::hwndD2GFX_Window, GWL_EXSTYLE, dwOldStyleEx);
     }
 }
 
 void D3D_DirectDrawPostSetup_Intercept() {
-    D3D_DirectDrawPostSetup();
+    RENDERER_D3D_InitGroundTileCache();
 }
 
 void ScreenSizeHook() {
-    ScreenWidth = InternalWidth;
-    ScreenHeight = InternalHeight;
-    ScreenMode = 1;
+    ScreenSizeX = RENDERER_nWindowWidth;
+    ScreenSizeY = RENDERER_nWindowHeight;
+    nScreenMode = 1;
 }
 
 void __stdcall GetWindowSizeByResolutionMode(int res, long* nWidth, long* nHeight) {
-    *nWidth = InternalWidth;
-    *nHeight = InternalHeight;
+    *nWidth = RENDERER_nWindowWidth;
+    *nHeight = RENDERER_nWindowHeight;
 }
 
 void ToggleFullscreen() {
     bD3DFull = !bD3DFull;
 
     if (bD3DFull) {
-        ShowWindow(D2::hWnd, SW_RESTORE);
-        SetWindowLong(D2::hWnd, GWL_STYLE, dwOldStyle & ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU));
-        ShowWindow(D2::hWnd, SW_MAXIMIZE);
+        ShowWindow(D2::hwndD2GFX_Window, SW_RESTORE);
+        SetWindowLong(D2::hwndD2GFX_Window, GWL_STYLE, dwOldStyle & ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU));
+        ShowWindow(D2::hwndD2GFX_Window, SW_MAXIMIZE);
     }
     else {
-        ShowWindow(D2::hWnd, SW_RESTORE);
-        SetWindowLong(D2::hWnd, GWL_STYLE, dwOldStyle);
+        ShowWindow(D2::hwndD2GFX_Window, SW_RESTORE);
+        SetWindowLong(D2::hwndD2GFX_Window, GWL_STYLE, dwOldStyle);
     }
 
     repaintsides = true;
-    SetWindowPos(D2::hWnd, NULL, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER);
+    SetWindowPos(D2::hwndD2GFX_Window, NULL, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER);
 }
 
 void __cdecl LogFileDivert(char* format, ...) {
@@ -97,8 +97,8 @@ HRESULT __stdcall CreatePrimarySurfaceIntercept(IDirectDraw7* ddi, LPDDSURFACEDE
 
     if (ret == DD_OK) {
         IDirectDrawClipper* Clipper;
-        IDirectDraw->CreateClipper(0, &Clipper, NULL);
-        Clipper->SetHWnd(0, D2::hWnd);
+        g_pDirectDraw7->CreateClipper(0, &Clipper, NULL);
+        Clipper->SetHWnd(0, D2::hwndD2GFX_Window);
         ppSurface[0]->SetClipper(Clipper);
         Clipper->Release();
     }
@@ -109,7 +109,7 @@ HRESULT __stdcall CreatePrimarySurfaceIntercept(IDirectDraw7* ddi, LPDDSURFACEDE
         caps2.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN;
         caps2.dwWidth = 32;
         caps2.dwHeight = 32;
-        IDirectDraw->CreateSurface(&caps2, &D3DSurfaceBackground, NULL);
+        g_pDirectDraw7->CreateSurface(&caps2, &D3DSurfaceBackground, NULL);
     }
 
     return ret;
@@ -119,21 +119,21 @@ HRESULT __stdcall CreateSecondarySurfaceIntercept(IDirectDrawSurface7* dds, LPDD
     DDSURFACEDESC2 caps{ sizeof(DDSURFACEDESC2) };
     caps.dwFlags = DDSD_WIDTH | DDSD_HEIGHT | DDSD_CAPS;
     caps.ddsCaps.dwCaps = DDSCAPS_TEXTURE | DDSCAPS_3DDEVICE;
-    caps.dwWidth = InternalWidth;
-    caps.dwHeight = InternalHeight;
-    return IDirectDraw->CreateSurface(&caps, ppSurface, NULL);
+    caps.dwWidth = RENDERER_nWindowWidth;
+    caps.dwHeight = RENDERER_nWindowHeight;
+    return g_pDirectDraw7->CreateSurface(&caps, ppSurface, NULL);
 }
 
 void ClearScreen() {
-    D3DRECT r{ 0, 0, (long)InternalWidth, (long)InternalHeight };
-    Direct3DViewport->Clear2(1, &r, D3DCLEAR_TARGET, 0xFF000000, 0, 0);
+    D3DRECT r{ 0, 0, (long)RENDERER_nWindowWidth, (long)RENDERER_nWindowHeight };
+    g_pD3DViewport->Clear2(1, &r, D3DCLEAR_TARGET, 0xFF000000, 0, 0);
 }
 
 // Keeps the game at a steady framerate without using too much CPU.
 // D2 doesn't do a great job at it by default, so we're helping out.
 void throttle() {
     // Single player doesn't need throttling. It runs at 25 fps already.
-    if (State["inGame"] && GameType < 1) {
+    if (State["inGame"] && eD2GSGameType_007a0610 < 1) {
         return;
     }
 
@@ -174,9 +174,9 @@ DWORD BeginScene() {
     // This is the highest filtering that retains the sprite outlines properly IMO.
     // Gaussian Cubic seems to deform the outlines a bit.
     DWORD filterType = filterValues[Settings["alwaysD3DFilter"]];
-    Direct3DDevice->SetTextureStageState(0, D3DTSS_MAGFILTER, filterType);
-    Direct3DDevice->SetTextureStageState(0, D3DTSS_MINFILTER, filterType);
-    Direct3DDevice->SetTextureStageState(0, D3DTSS_MIPFILTER, filterType);
+    g_pD3DDevice->SetTextureStageState(0, D3DTSS_MAGFILTER, filterType);
+    g_pD3DDevice->SetTextureStageState(0, D3DTSS_MINFILTER, filterType);
+    g_pD3DDevice->SetTextureStageState(0, D3DTSS_MIPFILTER, filterType);
 
     return true;
 }
@@ -186,23 +186,23 @@ BOOL __fastcall FlipSurfaces() {
 
     throttle();
 
-    GetClientRect(D2::hWnd, &windowrect);
-    MapWindowPoints(D2::hWnd, NULL, (LPPOINT)&windowrect, 2);
+    GetClientRect(D2::hwndD2GFX_Window, &windowrect);
+    MapWindowPoints(D2::hwndD2GFX_Window, NULL, (LPPOINT)&windowrect, 2);
 
-    long newWidth = (windowrect.bottom - windowrect.top) * InternalWidth / InternalHeight;
+    long newWidth = (windowrect.bottom - windowrect.top) * RENDERER_nWindowWidth / RENDERER_nWindowHeight;
     targetrect.top = windowrect.top;
     targetrect.bottom = windowrect.bottom;
     targetrect.left = (windowrect.left + windowrect.right - newWidth) / 2;
     targetrect.right = targetrect.left + newWidth;
 
     if (repaintsides) {
-        D3DSurfacePrimary->Blt(&windowrect, D3DSurfaceBackground, NULL, DDBLT_WAIT, NULL);
+        g_pD3DSurfaceBackbuffer->Blt(&windowrect, D3DSurfaceBackground, NULL, DDBLT_WAIT, NULL);
         repaintsides = false;
     }
 
     DDBLTFX fx{ 0 };
     fx.dwSize = sizeof(DDBLTFX);
-    D3DSurfacePrimary->Blt(&targetrect, D3DSurfaceSecondary, NULL, DDBLT_WAIT, &fx);
+    g_pD3DSurfaceBackbuffer->Blt(&targetrect, D3DSurfaceSecondary, NULL, DDBLT_WAIT, &fx);
 
     return TRUE;
 }
@@ -221,7 +221,7 @@ BOOL __stdcall SetWindowPosStub(HWND hWnd, HWND hWndInsertAfter, int X, int Y, i
 // PlugY's lockMouseCursor (Windowed.cpp) reads ResolutionX/Y at
 // D2Client + 0x31146C / 0x311470 — the exact bytes Charon writes to in
 // ScreenSizeHook (0x71146C / 0x711470). When alwaysD3D stretches the
-// window past 800x600 but ScreenWidth/Height stay at 800x600 (we *must*
+// window past 800x600 but ScreenSizeX/ScreenSizeY stay at 800x600 (we *must*
 // keep them at the internal canvas size, otherwise the hundreds of D2
 // internal call sites that use these globals as canvas dimensions for
 // UI placement would draw off-surface), PlugY ends up calling
@@ -236,10 +236,10 @@ BOOL __stdcall SetWindowPosStub(HWND hWnd, HWND hWndInsertAfter, int X, int Y, i
 // axis — so a deliberate /lockmouse via PlugY (or any clip that
 // already matches the window) is left untouched.
 void unclipIfStaleSmaller() {
-    if (!D2::hWnd) return;
+    if (!D2::hwndD2GFX_Window) return;
     RECT clip, win;
     if (!GetClipCursor(&clip)) return;
-    if (!GetWindowRect(D2::hWnd, &win)) return;
+    if (!GetWindowRect(D2::hwndD2GFX_Window, &win)) return;
     const LONG clipW = clip.right  - clip.left;
     const LONG clipH = clip.bottom - clip.top;
     const LONG winW  = win.right   - win.left;

@@ -14,7 +14,7 @@ void _postInit() {
     }
 }
 
-ASMPTR _init_rejoin = 0x405e36, _init_call_1 = 0x514530;
+ASMPTR _init_rejoin = 0x405e36, SOUND_Initialize = 0x514530;
 
 __declspec(naked) void _postInitHook() {
     __asm {
@@ -25,7 +25,7 @@ __declspec(naked) void _postInitHook() {
         jz skip
         movzx edx, byte ptr[esi + 0x224]
         mov ecx, dword ptr[esi]
-        call _init_call_1
+        call SOUND_Initialize
         mov eax, [0x74c704]
         mov dword ptr[ebp + -0x4], 0x1
         skip:
@@ -59,7 +59,7 @@ void __stdcall _serverLoop(D2::Types::IncompleteGameData* pGame) {
     }
 }
 
-REMOTEFUNC(int, FUN_0052d310,(void), 0x52d310)
+REMOTEFUNC(int, FreeUnusedItems,(void), 0x52d310)
 __declspec(naked) void _serverLoopIntercept() {
     __asm {
         // safety, we dont know what the function/gameloops messup in terms of ptrs
@@ -70,7 +70,7 @@ __declspec(naked) void _serverLoopIntercept() {
 
         popad
         // since we jump to this intercept as a call, the return value is set
-        JMP FUN_0052d310
+        JMP FreeUnusedItems
     }
 }
 
@@ -94,7 +94,7 @@ public:
             << CALL(_oogLoop)
             << BYTES(ASM::NOP, 18);
 
-        // overriding FUN_0052d310 function call
+        // overriding FreeUnusedItems function call
         MemoryPatch(0x52d96c) << CALL(_serverLoopIntercept);
 
     }

@@ -16,7 +16,7 @@ struct CubeMainIncomplete {
 };
 
 ASMPTR CreateTxtTableArray_Rejoin = 0x6122f9;
-ASMPTR CreateTxtTableArray_Original = 0x6122f0;
+ASMPTR CompileTxt_Original = 0x6122f0;
 
 __declspec(naked) void* __stdcall CreateTxtTableArray_Relocated(void* pMemory, char* szTableName, BINField* pBinFieldInput, int* nTxtTableSize, int nLineLength) {
     __asm {
@@ -99,7 +99,7 @@ namespace TxtOverride {
     class : public Feature {
     public:
         void init() {
-            MemoryPatch(CreateTxtTableArray_Original) << JUMP(CreateTxtTableArray_Intercept);
+            MemoryPatch(CompileTxt_Original) << JUMP(CreateTxtTableArray_Intercept);
         }
     } feature;
 

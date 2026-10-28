@@ -42,9 +42,9 @@ namespace Omnivision {
     }
 
     __declspec(naked) void playerCanSee_hook() {
-        static ASMPTR playerCanSeeOriginal = 0x4dc710;
+        static ASMPTR DRAW_WORLD_IsUnitInLineOfSight = 0x4dc710;
         __asm {
-            call playerCanSeeOriginal
+            call DRAW_WORLD_IsUnitInLineOfSight
             mov ecx, eax
             call playerCanSee_override
             ret
@@ -56,7 +56,7 @@ namespace Omnivision {
     }
 
     __declspec(naked) void lightUnitsOverride() {
-        static ASMPTR originalCall = 0x475780, lightUnitsOverride_rejoin = 0x475892, lightUnitsOverride_skip = 0x4758c6;
+        static ASMPTR LIGHTMAP_GetQualityLevel = 0x475780, lightUnitsOverride_rejoin = 0x475892, lightUnitsOverride_skip = 0x4758c6;
         __asm {
             pushad
             call useLightRadius
@@ -66,7 +66,7 @@ namespace Omnivision {
             jmp lightUnitsOverride_skip
 
             allow:
-            call originalCall
+            call LIGHTMAP_GetQualityLevel
             jmp lightUnitsOverride_rejoin
         }
     }

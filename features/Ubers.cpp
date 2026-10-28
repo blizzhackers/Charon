@@ -98,39 +98,39 @@ union GameFlagsType {
     } flags;
 };
 
-REMOTEFUNC(void __stdcall, UnitLocation, (D2::Types::UnitAny* pUnit, POINT* pPoint), 0x620870);
-REMOTEFUNC(void __fastcall, FindSpawnablePosition, (D2::Types::Room1* pDrlgRoom, POINT* pos, DWORD param_1_00, DWORD param_2_00, D2::Types::Room1** pRoomsNear, DWORD param_6, int param_7), 0x545340);
-REMOTEFUNC(BOOL __stdcall, SetsModeWithFlagsC4Update, (D2::Types::UnitAny* pUnit, DWORD dwMode), 0x624690);
+REMOTEFUNC(void __stdcall, GetCoords, (D2::Types::UnitAny* pUnit, POINT* pPoint), 0x620870);
+REMOTEFUNC(void __fastcall, FindSpawnableLocation, (D2::Types::Room1* pDrlgRoom, POINT* pos, DWORD param_1_00, DWORD param_2_00, D2::Types::Room1** pRoomsNear, DWORD param_6, int param_7), 0x545340);
+REMOTEFUNC(BOOL __stdcall, SetupUpdateFlag, (D2::Types::UnitAny* pUnit, DWORD dwMode), 0x624690);
 REMOTEFUNC(DWORD __fastcall, LinkPortal, (void* ptGame, int unused, D2::Types::UnitAny* ptObject, DWORD levelEndID, DWORD levelStartID), 0x56CF40);
-REMOTEFUNC(void __stdcall, SetObjectFlags, (D2::Types::UnitAny* ptObject, BYTE flags), 0x622300);
-REMOTEFUNC(BYTE __stdcall, GetObjectFlags, (D2::Types::UnitAny* ptObject), 0x6222C0);
-REMOTEFUNC(void __stdcall, RoomPortalFlag, (D2::Types::Room1* param_1, DWORD flag), 0x61AED0);
+REMOTEFUNC(void __stdcall, SetObjectPortalFlags, (D2::Types::UnitAny* ptObject, BYTE flags), 0x622300);
+REMOTEFUNC(BYTE __stdcall, GetObjectPortalFlags, (D2::Types::UnitAny* ptObject), 0x6222C0);
+REMOTEFUNC(void __stdcall, ToggleHasPortalFlagRoom, (D2::Types::Room1* param_1, DWORD flag), 0x61AED0);
 REMOTEFUNC(D2::Types::UnitAny* __fastcall, SpawnUniquePack, (IncompleteGameData* pGame, D2::Types::Room1* pRoom, BOOL zero, DWORD dwClassId, void* subtiles, int x, int y, BOOL flag), 0x5A43E0);
-REMOTEFUNC(D2::Types::UnitAny* __fastcall, SpawnMonster, (IncompleteGameData* pGame, D2::Types::Room1* pRoom, int x, int y, DWORD dwClassId, DWORD guid, DWORD seed, BOOL isChampion, BOOL isSuperUnique, DWORD superUniqueId, const char (&mods)[9]), 0x5A4440);
-REMOTEFUNC(void __fastcall, SpawnMonsterWithMode, (IncompleteGameData* pGame, D2::Types::Room1* pRoom, int32_t x, int32_t y, DWORD dwClassId, DWORD dwMode, DWORD dwUnkOne, DWORD dwUnkZero), 0x5b2f20);
-REMOTEFUNC(DWORD __fastcall, SpawnPortal, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, D2::Types::Room1* pDrlgRoom, int nX, int nY, DWORD eD2LevelId, D2::Types::UnitAny** param_7, int nClassId, DWORD param_9), 0x56D130);
-REMOTEFUNC(void __fastcall, OpenPortal, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, DWORD LevelId), 0x5A9930);
-REMOTEFUNC(DWORD __stdcall, GetAct, (int levelId), 0x6427f0);
-REMOTEFUNC(char* __stdcall, GetTCData, (WORD nTreasureClass, int level), 0x654E00);
-REMOTEFUNC(void __fastcall, RollItemToDrop, (IncompleteGameData* pGame, D2::Types::UnitAny* pVictim, D2::Types::UnitAny* pAttacker, char* pTCData, int param_5, int level, bool bIsItemFindDrop, D2::Types::UnitAny** pUnitTable, void* pUnitIndex, int param_10), 0x55A6D0);
-REMOTEFUNC(void __fastcall, DropItemByType, (IncompleteGameData* game, D2::Types::UnitAny* pUnit, DWORD dwItemCode, D2::ItemQuality nType), 0x585970);
-REMOTEFUNC(D2::Types::UnitAny* __fastcall, SpawnItemWithStruct, (IncompleteGameData* pGame, ItemGenerationData* pItemUnkownServer, int probablyZero), 0x558D90);
+REMOTEFUNC(D2::Types::UnitAny* __fastcall, SERVER_SpawnMonster, (IncompleteGameData* pGame, D2::Types::Room1* pRoom, int x, int y, DWORD dwClassId, DWORD guid, DWORD seed, BOOL isChampion, BOOL isSuperUnique, DWORD superUniqueId, const char (&mods)[9]), 0x5A4440);
+REMOTEFUNC(void __fastcall, SpawnMonsterAtRoomPos, (IncompleteGameData* pGame, D2::Types::Room1* pRoom, int32_t x, int32_t y, DWORD dwClassId, DWORD dwMode, DWORD dwUnkOne, DWORD dwUnkZero), 0x5b2f20);
+REMOTEFUNC(DWORD __fastcall, SERVER_SpawnPortal, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, D2::Types::Room1* pDrlgRoom, int nX, int nY, DWORD eD2LevelId, D2::Types::UnitAny** param_7, int nClassId, DWORD param_9), 0x56D130);
+REMOTEFUNC(void __fastcall, SpawnPortal, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, DWORD LevelId), 0x5A9930);
+REMOTEFUNC(DWORD __stdcall, GetActNoFromLevelNumber, (int levelId), 0x6427f0);
+REMOTEFUNC(char* __stdcall, TC_GetParsedTreasureClassByLevel, (WORD nTreasureClass, int level), 0x654E00);
+REMOTEFUNC(void __fastcall, SERVER_ITEM_RollItemToDrop, (IncompleteGameData* pGame, D2::Types::UnitAny* pVictim, D2::Types::UnitAny* pAttacker, char* pTCData, int param_5, int level, bool bIsItemFindDrop, D2::Types::UnitAny** pUnitTable, void* pUnitIndex, int param_10), 0x55A6D0);
+REMOTEFUNC(void __fastcall, SpawnDrop, (IncompleteGameData* game, D2::Types::UnitAny* pUnit, DWORD dwItemCode, D2::ItemQuality nType), 0x585970);
+REMOTEFUNC(D2::Types::UnitAny* __fastcall, ITEM_CreateItemInstance, (IncompleteGameData* pGame, ItemGenerationData* pItemUnkownServer, int probablyZero), 0x558D90);
 REMOTEFUNC(D2::Types::Room1* __fastcall, FindBestSpotToSpawnItem, (D2::Types::Room1* pDrlgRoom, POINT* pUnitPosition, POINT* pNewPosition, WORD param_2_00, BYTE param_5), 0x555DA0);
-REMOTEFUNC(DWORD __stdcall, GetItemClassIdByCode, (DWORD dwItemCode), 0x633680);
-REMOTEFUNC(void __fastcall, PlaySoundMaybe, (D2::Types::UnitAny* pUnit, short nUpdateType, D2::Types::UnitAny* pUpdateUnit), 0x553380);
-REMOTEFUNC(void __fastcall, ForEachConnectedClient, (IncompleteGameData* pGame, void* func, void *param), 0x52ded0);
-void* Send_0x5A_EventMessages = (void*)0x53c850;
+REMOTEFUNC(DWORD __stdcall, TXT_Items_ConvertItemCodeToItemClassId, (DWORD dwItemCode), 0x633680);
+REMOTEFUNC(void __fastcall, SetupUpdateEvent_AttachEventSound, (D2::Types::UnitAny* pUnit, short nUpdateType, D2::Types::UnitAny* pUpdateUnit), 0x553380);
+REMOTEFUNC(void __fastcall, ForEachClient, (IncompleteGameData* pGame, void* func, void *param), 0x52ded0);
+void* NET_D2GS_SERVER_Send_0x5A_SYSTEMMSG = (void*)0x53c850;
 
-REMOTEFUNC(void __fastcall, MephAI, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, D2::Types::AIParams* pAiParams), 0x5F78B0);
-REMOTEFUNC(void __fastcall, DiabloAI, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, D2::Types::AIParams* pAiParams), 0x5E9170);
-REMOTEFUNC(void __fastcall, BaalAI, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, D2::Types::AIParams* pAiParams), 0x5FCFE0);
+REMOTEFUNC(void __fastcall, AITHINK_Fn1_Mephisto, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, D2::Types::AIParams* pAiParams), 0x5F78B0);
+REMOTEFUNC(void __fastcall, AITHINK_Fn1_Diablo, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, D2::Types::AIParams* pAiParams), 0x5E9170);
+REMOTEFUNC(void __fastcall, AI_Fn1_BaalCrab, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, D2::Types::AIParams* pAiParams), 0x5FCFE0);
 
-ASMPTR UberBaalAIPointer = 0x73D330, UberBaalAI = 0x5FD200;
-ASMPTR UberMephAIPointer = 0x73D340, UberMephAI = 0x5F81C0;
-ASMPTR UberDiabloAIPointer = 0x73D350, UberDiabloAI = 0x05E9DF0;
+ASMPTR UberBaalAIPointer = 0x73D330, AI_Fn1_UberBaal = 0x5FD200;
+ASMPTR UberMephAIPointer = 0x73D340, AITHINK_Fn1_UberMephisto = 0x5F81C0;
+ASMPTR UberDiabloAIPointer = 0x73D350, AITHINK_Fn1_UberDiablo = 0x05E9DF0;
 
-ASMPTR CubeKeysHook = 0x565a90, CubeOrgansHook = 0x565aa0;
-ASMPTR KillMonster_Original = 0x57CCB0, KillMonster_Rejoin = 0x57CCB6;
+ASMPTR CUBE_SpecialOutput_Unused2 = 0x565a90, CUBE_SpecialOutput_Unused3 = 0x565aa0;
+ASMPTR SERVER_KillMonster_Original = 0x57CCB0, KillMonster_Rejoin = 0x57CCB6;
 
 DWORD guid = 0x4FFFFFFF;
 int seed = 0;
@@ -148,7 +148,7 @@ std::vector<const char*> keyCodes = {
 };
 
 DWORD GetActFromRoom(D2::Types::Room1* a) {
-    return GetAct(a->pRoom2->pLevel->dwLevelNo);
+    return GetActNoFromLevelNumber(a->pRoom2->pLevel->dwLevelNo);
 }
 
 D2::Types::UnitAny* PortalTo(IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, int levelId, bool isBlue = false) {
@@ -156,10 +156,10 @@ D2::Types::UnitAny* PortalTo(IncompleteGameData* pGame, D2::Types::UnitAny* pUni
     D2::Types::Room1* target;
     POINT pos;
 
-    if (GetActFromRoom(pUnit->pPath->pRoom1) == GetAct(levelId)) {
-        UnitLocation(pUnit, &pos);
-        FindSpawnablePosition(pUnit->pPath->pRoom1, &pos, 3, 0x400, &target, 4, 100);
-        SpawnPortal(pGame, nullptr, target, pos.x, pos.y, levelId, &pPortal, isBlue ? 0x3b : 0x3c, 0);
+    if (GetActFromRoom(pUnit->pPath->pRoom1) == GetActNoFromLevelNumber(levelId)) {
+        GetCoords(pUnit, &pos);
+        FindSpawnableLocation(pUnit->pPath->pRoom1, &pos, 3, 0x400, &target, 4, 100);
+        SERVER_SpawnPortal(pGame, nullptr, target, pos.x, pos.y, levelId, &pPortal, isBlue ? 0x3b : 0x3c, 0);
         if (pPortal) pPortal->pObjectData->Type = (BYTE) levelId;
         return pPortal;
     }
@@ -186,7 +186,7 @@ BOOL __fastcall CubeKeys_Intercept(IncompleteGameData* pGame, D2::Types::UnitAny
         return FALSE;
     }
 
-    if (pGame->nDifficulty != 2) return PlaySoundMaybe(pUnit, 0x14, pUnit), 0;
+    if (pGame->nDifficulty != 2) return SetupUpdateEvent_AttachEventSound(pUnit, 0x14, pUnit), 0;
     std::vector<int> p;
 
     if (!gameFlags[pGame->seed].flags.denPortal) {
@@ -216,7 +216,7 @@ BOOL __fastcall CubeKeys_Intercept(IncompleteGameData* pGame, D2::Types::UnitAny
         }
     }
 
-    return PlaySoundMaybe(pUnit, 0x14, pUnit), 0;
+    return SetupUpdateEvent_AttachEventSound(pUnit, 0x14, pUnit), 0;
 }
 
 BOOL __fastcall CubeOrgans_Intercept(IncompleteGameData* pGame, D2::Types::UnitAny* pUnit) {
@@ -224,14 +224,14 @@ BOOL __fastcall CubeOrgans_Intercept(IncompleteGameData* pGame, D2::Types::UnitA
         return FALSE;
     }
 
-    if (pGame->nDifficulty != 2 && !gameFlags[pGame->seed].flags.tristramPortal) return PlaySoundMaybe(pUnit, 0x14, pUnit), 0;
+    if (pGame->nDifficulty != 2 && !gameFlags[pGame->seed].flags.tristramPortal) return SetupUpdateEvent_AttachEventSound(pUnit, 0x14, pUnit), 0;
 
     if (PortalTo(pGame, pUnit, 136)) {
         gameFlags[pGame->seed].flags.tristramPortal = true;
         return !KEY_ORGAN_DEBUG;
     }
 
-    return PlaySoundMaybe(pUnit, 0x14, pUnit), 0;
+    return SetupUpdateEvent_AttachEventSound(pUnit, 0x14, pUnit), 0;
 }
 
 __declspec(naked) void __fastcall KillMonster_Relocated(IncompleteGameData* pGame, D2::Types::UnitAny* pVictim, D2::Types::UnitAny* pAttacker, BOOL bRemoveFromOwner) {
@@ -247,10 +247,10 @@ D2::Types::UnitAny* SpawnItem(IncompleteGameData* pGame, D2::Types::UnitAny* pVi
     ItemGenerationData pItemGen = { 0 };
     POINT pos, newPos;
 
-    UnitLocation(pVictim, &pos);
+    GetCoords(pVictim, &pos);
     pItemGen.pDrlgRoom = FindBestSpotToSpawnItem(pVictim->pPath->pRoom1, &pos, &newPos, 1, 1);
     pItemGen.wItemFormat = pGame->wItemFormat;
-    pItemGen.nItemClassId = GetItemClassIdByCode(*(DWORD*)szItemCode);
+    pItemGen.nItemClassId = TXT_Items_ConvertItemCodeToItemClassId(*(DWORD*)szItemCode);
     pItemGen.nPosX = newPos.x;
     pItemGen.nPosY = newPos.y;
     pItemGen.ItemQuality = nQuality;
@@ -271,7 +271,7 @@ D2::Types::UnitAny* SpawnItem(IncompleteGameData* pGame, D2::Types::UnitAny* pVi
     pItemGen.nInitSeed = randomNumber(0, INT_MAX);
     pItemGen.nModSeed  = randomNumber(0, INT_MAX);
 
-    return SpawnItemWithStruct(pGame, &pItemGen, 1);
+    return ITEM_CreateItemInstance(pGame, &pItemGen, 1);
 }
 
 void __fastcall KillMonster_Hook(IncompleteGameData* pGame, D2::Types::UnitAny* pVictim, D2::Types::UnitAny* pAttacker, BOOL bRemoveFromOwner) {
@@ -312,30 +312,30 @@ void __fastcall UberMephAIReplacement(IncompleteGameData* pGame, D2::Types::Unit
     D2::Types::UnitAny* pTarget = pAiParams->pTarget;
 
     if (randomNumber(0, 9) < 3) {
-        SpawnMonsterWithMode(pGame, pTarget->pPath->pRoom1, pTarget->pPath->xPos, pTarget->pPath->yPos, randomElement(ids), 8, 1, 0);
+        SpawnMonsterAtRoomPos(pGame, pTarget->pPath->pRoom1, pTarget->pPath->xPos, pTarget->pPath->yPos, randomElement(ids), 8, 1, 0);
     }
 
-    MephAI(pGame, pUnit, pAiParams);
+    AITHINK_Fn1_Mephisto(pGame, pUnit, pAiParams);
 }
 
 void __fastcall UberDiabloAIReplacement(IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, D2::Types::AIParams* pAiParams) {
     D2::Types::UnitAny* pTarget = pAiParams->pTarget;
 
     if (randomNumber(0, 9) == 0) {
-        SpawnMonsterWithMode(pGame, pTarget->pPath->pRoom1, pTarget->pPath->xPos, pTarget->pPath->yPos, 711, 1, 1, 0);
+        SpawnMonsterAtRoomPos(pGame, pTarget->pPath->pRoom1, pTarget->pPath->xPos, pTarget->pPath->yPos, 711, 1, 1, 0);
     }
 
-    DiabloAI(pGame, pUnit, pAiParams);
+    AITHINK_Fn1_Diablo(pGame, pUnit, pAiParams);
 }
 
 void __fastcall UberBaalAIReplacement(IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, D2::Types::AIParams* pAiParams) {
     const std::vector<DWORD> ids = { 731, 732 };
 
     if (randomNumber(0, 9) < 3) {
-        SpawnMonsterWithMode(pGame, pUnit->pPath->pRoom1, pUnit->pPath->xPos, pUnit->pPath->yPos, randomElement(ids), 1, 1, 0);
+        SpawnMonsterAtRoomPos(pGame, pUnit->pPath->pRoom1, pUnit->pPath->xPos, pUnit->pPath->yPos, randomElement(ids), 1, 1, 0);
     }
 
-    BaalAI(pGame, pUnit, pAiParams);
+    AI_Fn1_BaalCrab(pGame, pUnit, pAiParams);
 }
 
 __declspec(naked) void __fastcall SPAWN_UniqueMonster_Relocated(IncompleteGameData* pGame, D2::Types::Room1* pRoom, int32_t nX, int32_t nY, uint32_t dwUniqueId) {
@@ -351,7 +351,7 @@ __declspec(naked) void __fastcall SPAWN_UniqueMonster_Relocated(IncompleteGameDa
 void __fastcall SPAWN_UniqueMonster(IncompleteGameData* pGame, D2::Types::Room1* pRoom, int32_t nX, int32_t nY, uint32_t dwUniqueId) {
     if (Settings["ladderItems"] && gameFlags[pGame->seed].flags.dCloneAnnounced && !gameFlags[pGame->seed].flags.dCloneSpawned) {
         char mods[9] = { 1 };
-        if (SpawnMonster(pGame, pRoom, nX, nY, 333, guid++, 0, false, false, 0, mods)) {
+        if (SERVER_SpawnMonster(pGame, pRoom, nX, nY, 333, guid++, 0, false, false, 0, mods)) {
             gameFlags[pGame->seed].flags.dCloneSpawned = true;
         }
     }
@@ -365,16 +365,16 @@ namespace Ubers {
     class : public Feature {
     public:
         void init() {
-            MemoryPatch(CubeKeysHook) << JUMP(CubeKeys_Intercept);
-            MemoryPatch(CubeOrgansHook) << JUMP(CubeOrgans_Intercept);
+            MemoryPatch(CUBE_SpecialOutput_Unused2) << JUMP(CubeKeys_Intercept);
+            MemoryPatch(CUBE_SpecialOutput_Unused3) << JUMP(CubeOrgans_Intercept);
 
             // These are temporary AI replacements.
             // They don't do extra uber stuff.
-            MemoryPatch(UberMephAI) << JUMP(UberMephAIReplacement);
-            MemoryPatch(UberDiabloAI) << JUMP(UberDiabloAIReplacement);
-            MemoryPatch(UberBaalAI) << JUMP(UberBaalAIReplacement);
+            MemoryPatch(AITHINK_Fn1_UberMephisto) << JUMP(UberMephAIReplacement);
+            MemoryPatch(AITHINK_Fn1_UberDiablo) << JUMP(UberDiabloAIReplacement);
+            MemoryPatch(AI_Fn1_UberBaal) << JUMP(UberBaalAIReplacement);
 
-            MemoryPatch(KillMonster_Original) << JUMP(KillMonster_Hook);
+            MemoryPatch(SERVER_KillMonster_Original) << JUMP(KillMonster_Hook);
             MemoryPatch(0x5a49b0) << JUMP(SPAWN_UniqueMonster) << NOP_TO(0x5a49b9);
 
             // Ignore durability modification on custom spawn items
@@ -404,7 +404,7 @@ namespace Ubers {
                     }
 
                     SaveSettings();
-                    ForEachConnectedClient(pGame, Send_0x5A_EventMessages, &packet);
+                    ForEachClient(pGame, NET_D2GS_SERVER_Send_0x5A_SYSTEMMSG, &packet);
                 }
             }
         }
@@ -420,7 +420,7 @@ namespace Ubers {
                 for (unit = room->pPreset; unit != NULL; unit = unit->pPresetNext) {
                     if (unit->dwTxtFileNo == 397 && !gameFlags[pGame->seed].flags.lillithSpawned) {
                         char mods[9] = { 1 };
-                        if (SpawnMonster(pGame, pRoom1, room->dwPosX * 5 + unit->dwPosX, room->dwPosY * 5 + unit->dwPosY, 707, guid++, 0, false, false, 0, mods)) {
+                        if (SERVER_SpawnMonster(pGame, pRoom1, room->dwPosX * 5 + unit->dwPosX, room->dwPosY * 5 + unit->dwPosY, 707, guid++, 0, false, false, 0, mods)) {
                             gameFlags[pGame->seed].flags.lillithSpawned = true;
                         }
                     }
@@ -430,7 +430,7 @@ namespace Ubers {
                 for (unit = room->pPreset; unit != NULL; unit = unit->pPresetNext) {
                     if (unit->dwTxtFileNo == 402 && !gameFlags[pGame->seed].flags.durielSpawned) {
                         char mods[9] = { 1 };
-                        if (SpawnMonster(pGame, pRoom1, room->dwPosX * 5 + unit->dwPosX, room->dwPosY * 5 + unit->dwPosY, 708, guid++, 0, false, false, 0, mods)) {
+                        if (SERVER_SpawnMonster(pGame, pRoom1, room->dwPosX * 5 + unit->dwPosX, room->dwPosY * 5 + unit->dwPosY, 708, guid++, 0, false, false, 0, mods)) {
                             gameFlags[pGame->seed].flags.durielSpawned = true;
                         }
                     }
@@ -440,7 +440,7 @@ namespace Ubers {
                 for (unit = room->pPreset; unit != NULL; unit = unit->pPresetNext) {
                     if (unit->dwTxtFileNo == 397 && !gameFlags[pGame->seed].flags.izualSpawned) {
                         char mods[9] = { 1 };
-                        if (SpawnMonster(pGame, pRoom1, room->dwPosX * 5 + unit->dwPosX, room->dwPosY * 5 + unit->dwPosY, 706, guid++, 0, false, false, 0, mods)) {
+                        if (SERVER_SpawnMonster(pGame, pRoom1, room->dwPosX * 5 + unit->dwPosX, room->dwPosY * 5 + unit->dwPosY, 706, guid++, 0, false, false, 0, mods)) {
                             gameFlags[pGame->seed].flags.izualSpawned = true;
                         }
                     }
@@ -452,17 +452,17 @@ namespace Ubers {
                     case 26: // Cain cage original, uber spawns
                         char mods[9] = { 1 };
                         if (!gameFlags[pGame->seed].flags.uberMephSpawned) {
-                            if (SpawnMonster(pGame, pRoom1, room->dwPosX * 5 + unit->dwPosX, room->dwPosY * 5 + unit->dwPosY, 704, guid++, 0, false, false, 0, mods)) {
+                            if (SERVER_SpawnMonster(pGame, pRoom1, room->dwPosX * 5 + unit->dwPosX, room->dwPosY * 5 + unit->dwPosY, 704, guid++, 0, false, false, 0, mods)) {
                                 gameFlags[pGame->seed].flags.uberMephSpawned = true;
                             }
                         }
                         if (!gameFlags[pGame->seed].flags.uberBaalSpawned) {
-                            if (SpawnMonster(pGame, pRoom1, room->dwPosX * 5 + unit->dwPosX, room->dwPosY * 5 + unit->dwPosY, 709, guid++, 0, false, false, 0, mods)) {
+                            if (SERVER_SpawnMonster(pGame, pRoom1, room->dwPosX * 5 + unit->dwPosX, room->dwPosY * 5 + unit->dwPosY, 709, guid++, 0, false, false, 0, mods)) {
                                 gameFlags[pGame->seed].flags.uberBaalSpawned = true;
                             }
                         }
                         if (!gameFlags[pGame->seed].flags.uberDiabloSpawned) {
-                            if (SpawnMonster(pGame, pRoom1, room->dwPosX * 5 + unit->dwPosX, room->dwPosY * 5 + unit->dwPosY, 705, guid++, 0, false, false, 0, mods)) {
+                            if (SERVER_SpawnMonster(pGame, pRoom1, room->dwPosX * 5 + unit->dwPosX, room->dwPosY * 5 + unit->dwPosY, 705, guid++, 0, false, false, 0, mods)) {
                                 gameFlags[pGame->seed].flags.uberDiabloSpawned = true;
                             }
                         }

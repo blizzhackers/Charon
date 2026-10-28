@@ -4,9 +4,9 @@
 #include "headers/remote.h"
 #include <list>
 
-REMOTEFUNC(void __fastcall, PrintGameString, (const wchar_t* wMessage, int nColor), 0x49E3A0)
-REMOTEFUNC(void __fastcall, PrintPartyString, (const wchar_t* wMessage, int nColor), 0x49E5C0) // Updated 1.14d //0049E5C0-BASE
-REMOTEREF(DWORD, PanelState, 0x07a5210);
+REMOTEFUNC(void __fastcall, TEXT_PrintGameString, (const wchar_t* wMessage, int nColor), 0x49E3A0)
+REMOTEFUNC(void __fastcall, TEXT_PrintPartyMessage, (const wchar_t* wMessage, int nColor), 0x49E5C0) // Updated 1.14d //0049E5C0-BASE
+REMOTEREF(DWORD, gnBorderType, 0x07a5210);
 
 struct GameLogMessage {
     DWORD timestamp;
@@ -90,7 +90,7 @@ namespace GameLog {
             DWORD height = 0, width = 0, fontno = 13;
             int space = -8;
 
-            if (PanelState == 2) {
+            if (gnBorderType == 2) {
                 left += D2::ScreenWidth / 2;
             }
 
@@ -106,17 +106,17 @@ namespace GameLog {
                 GameLogMessages.pop_front();
             }
 
-            D2::SetFont(fontno);
+            D2::SetAndReturnLastFont(fontno);
 
             for (GameLogMessage message : GameLogMessages) {
-                height = D2::GetTextSize(message.text.c_str(), &width, &fontno);
-                D2::DrawGameText(message.text.c_str(), left, top += (height + space), 0, 0);
+                height = D2::TEXT_CalcTextDimensions(message.text.c_str(), &width, &fontno);
+                D2::DRAW_text(message.text.c_str(), left, top += (height + space), 0, 0);
             }
         }
 
         void gamePostDraw() {
-            if (!D2::GetUiFlag(0x18)) {
-                showMessages(D2::GetUiFlag(0x13));
+            if (!D2::GetUIFlag(0x18)) {
+                showMessages(D2::GetUIFlag(0x13));
             }
         }
 
