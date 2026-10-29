@@ -3,11 +3,13 @@
 #include "headers/hook.h"
 #include "headers/remote.h"
 #include "headers/dialog.h"
+#include "headers/opengl_game.h"
 #include <unordered_map>
 #include <functional>
 #include <fstream>
 #include <string>
 #include <cmath>
+#include "headers/settings_data.h"
 
 REMOTEFUNC(void __stdcall, GAME_SetFrameRate, (int32_t param_1), 0x52df80);
 
@@ -15,27 +17,12 @@ wchar_t settingsPath[512] = { 0 };
 
 void LoadSettings() {
     std::ifstream file(settingsPath);
-    std::string key;
-    DWORD value;
-
-    while (file) {
-        std::getline(file, key, ':');
-        file >> value;
-        if (key.length()) {
-            Settings[key] = value;
-        }
-        std::getline(file, key);
-    }
+    Settings = CharonSettings::Load(file);
 }
 
 void SaveSettings() {
-    std::ofstream file(settingsPath);
-
-    for (std::pair<std::string, DWORD> element : Settings) {
-        if (element.first.length()) {
-            file << element.first << ": " << element.second << std::endl;
-        }
-    }
+    if (!CharonSettings::Save(settingsPath, Settings))
+        gamelog << "Could not save settings; the previous file was preserved." << std::endl;
 }
 
 struct DialogToggleInfo {
@@ -49,164 +36,49 @@ struct DialogToggleInfo {
     }
 };
 
+DialogToggleInfo* BooleanSetting(const wchar_t* label, const char* key) {
+    return new DialogToggleInfo(label,
+        [key]() -> std::wstring {
+            return Settings.at(key) ? L"\u00FFc2On" : L"\u00FFc1Off";
+        }, [key](MouseButton button, bool down) {
+            if (down) return;
+            Settings[key] = !Settings.at(key);
+            SaveSettings();
+        });
+}
+
 std::vector<std::vector<DialogToggleInfo*>> SettingsColumns = {
     { // First Column
-        new DialogToggleInfo(L"Reveal Map",
-            []() -> std::wstring {
-                return Settings["revealLevel"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["revealLevel"] = !Settings["revealLevel"];
-                SaveSettings();
-            }),
-        new DialogToggleInfo(L"Show Monsters",
-            []() -> std::wstring {
-                return Settings["showMonsters"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["showMonsters"] = !Settings["showMonsters"];
-                SaveSettings();
-            }),
-        new DialogToggleInfo(L"Show Items",
-            []() -> std::wstring {
-                return Settings["showItems"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["showItems"] = !Settings["showItems"];
-                SaveSettings();
-            }),
-        new DialogToggleInfo(L"Show Missiles",
-            []() -> std::wstring {
-                return Settings["showMissiles"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["showMissiles"] = !Settings["showMissiles"];
-                SaveSettings();
-            }),
-        new DialogToggleInfo(L"Disable Rooftops",
-            []() -> std::wstring {
-                return Settings["disableRoofs"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["disableRoofs"] = !Settings["disableRoofs"];
-                SaveSettings();
-            }),
-        new DialogToggleInfo(L"Info Popups",
-            []() -> std::wstring {
-                return Settings["infoPopups"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["infoPopups"] = !Settings["infoPopups"];
-                SaveSettings();
-            }),
+        BooleanSetting(L"Reveal Map", "revealLevel"),
+        BooleanSetting(L"Show Monsters", "showMonsters"),
+        BooleanSetting(L"Show Items", "showItems"),
+        BooleanSetting(L"Show Missiles", "showMissiles"),
+        BooleanSetting(L"Disable Rooftops", "disableRoofs"),
+        BooleanSetting(L"Info Popups", "infoPopups"),
         nullptr, // Empty Gap
-        new DialogToggleInfo(L"Regen Single Player Maps",
-            []() -> std::wstring {
-                return Settings["regenMap"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["regenMap"] = !Settings["regenMap"];
-                SaveSettings();
-            }),
-        new DialogToggleInfo(L"Show Extra Item Info",
-            []() -> std::wstring {
-                return Settings["itemInfo"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["itemInfo"] = !Settings["itemInfo"];
-                SaveSettings();
-            }),
-        new DialogToggleInfo(L"Default /nopickup",
-            []() -> std::wstring {
-                return Settings["noPickup"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["noPickup"] = !Settings["noPickup"];
-                SaveSettings();
-            }),
-        new DialogToggleInfo(L"Prevent socketing",
-            []() -> std::wstring {
-                return Settings["preventSockets"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["preventSockets"] = !Settings["preventSockets"];
-                SaveSettings();
-            }),
-        new DialogToggleInfo(L"Lock Alt Items",
-            []() -> std::wstring {
-                return Settings["altToggle"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["altToggle"] = !Settings["altToggle"];
-                SaveSettings();
-            }),
+        BooleanSetting(L"Regen Single Player Maps", "regenMap"),
+        BooleanSetting(L"Show Extra Item Info", "itemInfo"),
+        BooleanSetting(L"Default /nopickup", "noPickup"),
+        BooleanSetting(L"Prevent socketing", "preventSockets"),
+        BooleanSetting(L"Lock Alt Items", "altToggle"),
         nullptr, // Empty Gap
-        new DialogToggleInfo(L"Repeatable Respec Quest",
-            []() -> std::wstring {
-                return Settings["respecOverride"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["respecOverride"] = !Settings["respecOverride"];
-                SaveSettings();
-            }),
-        new DialogToggleInfo(L"Repeatable Imbue Quest",
-            []() -> std::wstring {
-                return Settings["imbueOverride"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["imbueOverride"] = !Settings["imbueOverride"];
-                SaveSettings();
-            }),
-        new DialogToggleInfo(L"Repeatable Socket Quest",
-            []() -> std::wstring {
-                return Settings["socketOverride"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["socketOverride"] = !Settings["socketOverride"];
-                SaveSettings();
-            }),
-        new DialogToggleInfo(L"Repeatable Cow Portal",
-            []() -> std::wstring {
-                return Settings["cowsOverride"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["cowsOverride"] = !Settings["cowsOverride"];
-                SaveSettings();
-            }),
+        BooleanSetting(L"Repeatable Respec Quest", "respecOverride"),
+        BooleanSetting(L"Repeatable Imbue Quest", "imbueOverride"),
+        BooleanSetting(L"Repeatable Socket Quest", "socketOverride"),
+        BooleanSetting(L"Repeatable Cow Portal", "cowsOverride"),
         nullptr, // Empty Gap
-        new DialogToggleInfo(L"Disable screen shake",
-            []() -> std::wstring {
-                return Settings["disableShake"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["disableShake"] = !Settings["disableShake"];
-                SaveSettings();
-            }),
-        new DialogToggleInfo(L"Disable splash on start",
-            []() -> std::wstring {
-                return Settings["disableSplash"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["disableSplash"] = !Settings["disableSplash"];
-                SaveSettings();
-            }),
+        BooleanSetting(L"Disable screen shake", "disableShake"),
+        BooleanSetting(L"Disable splash on start", "disableSplash"),
     }, { // Second Column
-        new DialogToggleInfo(L"\u00FFc3*\u00FFc4Enable Ladder Features",
-            []() -> std::wstring {
-                return Settings["ladderItems"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["ladderItems"] = !Settings["ladderItems"];
-                SaveSettings();
-            }),
+        BooleanSetting(L"\u00FFc3*\u00FFc4Enable Ladder Features", "ladderItems"),
         new DialogToggleInfo(L"SOJ Sale Time (seconds)",
             []() -> std::wstring {
-                return Settings["sojSaleTime"] == 150 ? L"\u00FFc2~150" : (L"\u00FFc4~" + std::to_wstring(Settings["sojSaleTime"]));
+                return Settings.at("sojSaleTime") == 150 ? L"\u00FFc2~150" : (L"\u00FFc4~" + std::to_wstring(Settings.at("sojSaleTime")));
             }, [](MouseButton button, bool down) -> void {
                 if (down) return;
                 
                 if (button == MouseButton::LEFT) {
-                    Settings["sojSaleTime"] += Settings["sojSaleTime"] < 15 ? 1 : 15;
+                    Settings["sojSaleTime"] = CharonSettings::Bounded("sojSaleTime", Settings["sojSaleTime"] + (Settings["sojSaleTime"] < 15 ? 1 : 15));
                 }
                 else if (button == MouseButton::RIGHT && Settings["sojSaleTime"] > 1) {
                     Settings["sojSaleTime"] -= Settings["sojSaleTime"] <= 15 ? 1 : 15;
@@ -214,33 +86,15 @@ std::vector<std::vector<DialogToggleInfo*>> SettingsColumns = {
 
                 SaveSettings();
             }),
-        new DialogToggleInfo(L"\u00FFc3*\u00FFc4Tweak Drops for Solo",
-            []() -> std::wstring {
-                return Settings["rebalanceDrops"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["rebalanceDrops"] = !Settings["rebalanceDrops"];
-                SaveSettings();
-            }),
-        new DialogToggleInfo(L"\u00FFc4Item QoL Fixes",
-            []() -> std::wstring {
-                return Settings["itemQOL"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["itemQOL"] = !Settings["itemQOL"];
-                SaveSettings();
-            }),
+        BooleanSetting(L"\u00FFc3*\u00FFc4Tweak Drops for Solo", "rebalanceDrops"),
+        BooleanSetting(L"\u00FFc4Item QoL Fixes", "itemQOL"),
         new DialogToggleInfo(L"XP Bonus",
             []() -> std::wstring {
-                if (Settings["xpBonus"] < 2) {
-                    Settings["xpBonus"] = 1;
-                }
-
-                if (Settings["xpBonus"] == 3) {
+                if (Settings.at("xpBonus") == 3) {
                     return L"\u00FFc2x3";
                 }
-                else if (Settings["xpBonus"] >= 2) {
-                    return L"\u00FFc4x" + std::to_wstring(Settings["xpBonus"]);
+                else if (Settings.at("xpBonus") >= 2) {
+                    return L"\u00FFc4x" + std::to_wstring(Settings.at("xpBonus"));
                 } else {
                     return L"\u00FFc1Off";
                 }
@@ -252,7 +106,7 @@ std::vector<std::vector<DialogToggleInfo*>> SettingsColumns = {
                         Settings["xpBonus"]++;
                     }
                     else {
-                        Settings["xpBonus"] <<= 1;
+                        Settings["xpBonus"] = CharonSettings::Bounded("xpBonus", Settings["xpBonus"] << 1);
                     }
                 } else if (button == MouseButton::RIGHT && Settings["xpBonus"] > 1) {
                     if (Settings["xpBonus"] <= 4) {
@@ -267,93 +121,56 @@ std::vector<std::vector<DialogToggleInfo*>> SettingsColumns = {
             }),
         new DialogToggleInfo(L"XP Min Award",
             []() -> std::wstring {
-                if (Settings["xpMin"] > 8000) {
+                if (Settings.at("xpMin") > 8000) {
                     return L"\u00FFc4MAX";
                 } else {
-                    return L"\u00FFc3" + std::to_wstring(Settings["xpMin"]);
+                    return L"\u00FFc3" + std::to_wstring(Settings.at("xpMin"));
                 }
             }, [](MouseButton button, bool down) -> void {
                 if (down) return;
 
                 if (button == MouseButton::LEFT && Settings["xpMin"] <= 8000) {
-                    Settings["xpMin"] += 250;
+                    Settings["xpMin"] = CharonSettings::Bounded("xpMin", Settings["xpMin"] + 250);
                 } else if (button == MouseButton::RIGHT && Settings["xpMin"] > 0) {
-                    Settings["xpMin"] -= 250;
+                    Settings["xpMin"] = Settings["xpMin"] > 250 ? Settings["xpMin"] - 250 : 0;
                 }
 
                 SaveSettings();
             }),
         nullptr, // Empty Gap
-        new DialogToggleInfo(L"\u00FFc;*\u00FFc4Always D3D Mode",
+        new DialogToggleInfo(L"Display Mode",
             []() -> std::wstring {
-                return Settings["alwaysD3D"] ? L"\u00FFc2On" : L"\u00FFc1Off";
+                return Settings.at("openGLFullscreen") ? L"\u00FFc4Fullscreen" : L"\u00FFc4Windowed";
             }, [](MouseButton button, bool down) -> void {
                 if (down) return;
-                Settings["alwaysD3D"] = !Settings["alwaysD3D"];
-                SaveSettings();
+                CharonGL::ToggleFullscreen();
             }),
-        new DialogToggleInfo(L"AD3D Filter",
+        new DialogToggleInfo(L"OpenGL Filter",
             []() -> std::wstring {
-                std::wstring ret = Settings["alwaysD3DFilter"] ? L"\u00FFc8" : L"\u00FFc5";
-                ret += filterParams[Settings["alwaysD3DFilter"]];
-                return ret;
+                const wchar_t* names[] = {L"Nearest", L"Bilinear + CAS", L"Jinc2", L"xBRZ", L"ScaleFX", L"CRT", L"CRT Curved", L"LCD"};
+                static_assert(std::size(names) == static_cast<unsigned>(CharonGL::Filter::Count), "Filter labels match saved indices");
+                return L"\u00FFc4" + std::wstring(names[Settings.at("openGLFilter") % static_cast<unsigned>(CharonGL::Filter::Count)]);
             }, [](MouseButton button, bool down) -> void {
                 if (down) return;
-                Settings["alwaysD3DFilter"] = (Settings["alwaysD3DFilter"] + 1) % 6;
+                Settings["openGLFilter"] = (Settings["openGLFilter"] + 1) % static_cast<unsigned>(CharonGL::Filter::Count);
                 SaveSettings();
             }),
-        new DialogToggleInfo(L"AD3D Start Fullscreen",
-            []() -> std::wstring {
-                return Settings["alwaysD3DStartFull"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["alwaysD3DStartFull"] = !Settings["alwaysD3DStartFull"];
-                SaveSettings();
-            }),
-        new DialogToggleInfo(L"Draw all states",
-             []() -> std::wstring {
-                 return Settings["drawAllStates"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-             }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["drawAllStates"] = !Settings["drawAllStates"];
-                SaveSettings();
-            }),
-        new DialogToggleInfo(L"Omnivision",
-            []() -> std::wstring {
-                return Settings["omnivision"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["omnivision"] = !Settings["omnivision"];
-                SaveSettings();
-            }),
+        BooleanSetting(L"Draw all states", "drawAllStates"),
+        BooleanSetting(L"Omnivision", "omnivision"),
         nullptr, // Empty Gap
         new DialogToggleInfo(L"Draw Color Swatch",
             []() -> std::wstring {
-                return State["drawSwatch"] ? L"\u00FFc2On" : L"\u00FFc1Off";
+                return State.find("drawSwatch") != State.end() && State.at("drawSwatch") ? L"\u00FFc2On" : L"\u00FFc1Off";
             }, [](MouseButton button, bool down) -> void {
                 if (down) return;
                 State["drawSwatch"] = !State["drawSwatch"];
                 SaveSettings();
             }),
-        new DialogToggleInfo(L"Disable Weather Effects",
-            []() -> std::wstring {
-                return Settings["disableWeather"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["disableWeather"] = !Settings["disableWeather"];
-                SaveSettings();
-            }),
-        new DialogToggleInfo(L"Debug Mode",
-            []() -> std::wstring {
-                return Settings["debugMode"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["debugMode"] = !Settings["debugMode"];
-                SaveSettings();
-            }),
+        BooleanSetting(L"Disable Weather Effects", "disableWeather"),
+        BooleanSetting(L"Debug Mode", "debugMode"),
         new DialogToggleInfo(L"Debug Mode Type",
             []() -> std::wstring {
-                switch (Settings["debugModeType"]) {
+                switch (Settings.at("debugModeType")) {
                 case DebugMode::NORMAL:
                     return L"\u00FFc5Normal";
                 case DebugMode::DARK:
@@ -367,32 +184,18 @@ std::vector<std::vector<DialogToggleInfo*>> SettingsColumns = {
                 Settings["debugModeType"] = (Settings["debugModeType"] + 1) % 3;
                 SaveSettings();
             }),
-        new DialogToggleInfo(L"Show Walls in Debug",
-            []() -> std::wstring {
-                return Settings["debugModeWalls"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["debugModeWalls"] = !Settings["debugModeWalls"];
-                SaveSettings();
-            }),
-        new DialogToggleInfo(L"Debug Packets",
-            []() -> std::wstring {
-                return Settings["debugPackets"] ? L"\u00FFc2On" : L"\u00FFc1Off";
-            }, [](MouseButton button, bool down) -> void {
-                if (down) return;
-                Settings["debugPackets"] = !Settings["debugPackets"];
-                SaveSettings();
-            }),
+        BooleanSetting(L"Show Walls in Debug", "debugModeWalls"),
+        BooleanSetting(L"Debug Packets", "debugPackets"),
         new DialogToggleInfo(L"Target Single Player FPS",
             []() -> std::wstring {
-                return L"\u00FFc4" + std::to_wstring(Settings["TargetFPS"]);
+                return L"\u00FFc4" + std::to_wstring(Settings.at("TargetFPS"));
             }, [](MouseButton button, bool down) -> void {
                 if (down) return;
 
                 if (button == MouseButton::LEFT) {
-                    Settings["TargetFPS"] += 5;
+                    Settings["TargetFPS"] = CharonSettings::Bounded("TargetFPS", Settings["TargetFPS"] + 5);
                 }
-                else if (button == MouseButton::RIGHT && Settings["TargetFPS"] > 0) {
+                else if (button == MouseButton::RIGHT && Settings["TargetFPS"] > 5) {
                     Settings["TargetFPS"] -= 5;
                 }
 
@@ -491,14 +294,6 @@ namespace SettingsFeature {
             }
 
             D2::gbSuppressItemSelection = Settings["noPickup"];
-
-            if (!Settings["TargetFPS"]) {
-                Settings["TargetFPS"] = 25;
-            }
-
-            if (!Settings["sojSaleTime"]) {
-                Settings["sojSaleTime"] = 150;
-            }
 
             GAME_SetFrameRate(Settings["TargetFPS"]);
 

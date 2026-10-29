@@ -93,7 +93,7 @@
     <ClCompile Include="dllmain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="features\AlwaysD3D.cpp">
+    <ClCompile Include="features\OpenGL.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="features\DebugMode.cpp">

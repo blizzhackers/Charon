@@ -4,6 +4,7 @@
 
 #include "D2Structs.h"
 #include "ghidra.h"
+#include "custom_packet.h"
 #include <map>
 #include <cmath>
 
@@ -16,13 +17,6 @@ double randDoubleInRange(double low, double high);
 
 void __stdcall serverSendPacket(Ghidra::D2ClientStrc* pClient, char* pBytes, size_t nSize);
 void clientSendPacket(char* pBytes, size_t nSize);
-const char CUSTOM_PACKET_ID = 0x2B;
-
-struct CustomPacketHeader {
-	BYTE id = CUSTOM_PACKET_ID;
-	short size = sizeof(CustomPacketHeader);
-};
-
 void ServerSendCustomData(Ghidra::D2ClientStrc* pClient, char* pBytes, size_t nSize);
 void ClientSendCustomData(char* pBytes, size_t nSize);
 

@@ -7,6 +7,7 @@
 #include "headers/common.h"
 #include "headers/hook.h"
 #include "headers/remote.h"
+#include "headers/opengl_game.h"
 #include <iostream>
 
 const ASMPTR SoundChaosCheckStart = 0x47c53d;
@@ -35,6 +36,7 @@ BOOL keyPressEvent(WPARAM wparam, LPARAM lparam) {
 }
 
 LRESULT CALLBACK WindowProc(_In_ HWND hwnd, _In_ UINT uMsg, _In_ WPARAM wParam, _In_ LPARAM lParam) {
+    lParam = CharonGL::MapMouseMessage(hwnd, uMsg, lParam);
     bool allowDefault = true;
     for (Feature* f = Features; f; f = f->next) {
         if (!f->windowMessage(hwnd, uMsg, wParam, lParam)) {

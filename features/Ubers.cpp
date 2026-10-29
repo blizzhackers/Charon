@@ -210,7 +210,7 @@ BOOL __fastcall CubeOrgans_Intercept(IncompleteGameData* pGame, D2::Types::UnitA
         return FALSE;
     }
 
-    if (pGame->nDifficulty != 2 && !gameFlags[pGame->seed].flags.tristramPortal) return SetupUpdateEvent_AttachEventSound(pUnit, 0x14, pUnit), 0;
+    if (pGame->nDifficulty != 2 || gameFlags[pGame->seed].flags.tristramPortal) return SetupUpdateEvent_AttachEventSound(pUnit, 0x14, pUnit), 0;
 
     if (PortalTo(pGame, pUnit, 136)) {
         gameFlags[pGame->seed].flags.tristramPortal = true;

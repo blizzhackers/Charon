@@ -100,8 +100,15 @@ REMOTEFUNC(void __fastcall, NET_D2GS_CLIENT_PacketHandle_from0xAF, (BYTE* pBytes
 
 void __fastcall NET_D2GS_CLIENT_PacketHandler_Replacement(BYTE* pBytes, size_t nSize)
 {
-    if (nSize != 0xffffffff && Settings["debugPackets"])
+    // The native low-opcode dispatcher treats -1 as a no-op, without reading pBytes.
+    if (nSize == 0xffffffff || !pBytes || nSize == 0) {
+        NET_D2GS_CLIENT_PacketHandle_to0xAF(pBytes, nSize);
+        return;
+    }
+    if (Settings["debugPackets"])
         gamelog << COLOR(2) << "D2GS " << COLOR(4) << "(SERVER -> CLIENT)" << COLOR(0) << " 0x" << std::hex << pBytes[0] << std::dec << " size of " << nSize << std::endl;
+
+    if (CustomPackets::DispatchClientPacket(reinterpret_cast<char*>(pBytes), nSize)) return;
 
     if (pBytes[0] >= 0xAF) {
         NET_D2GS_CLIENT_PacketHandle_from0xAF(pBytes, nSize);
@@ -114,13 +121,15 @@ void __fastcall NET_D2GS_CLIENT_PacketHandler_Replacement(BYTE* pBytes, size_t n
 
 // D2GS (CLIENT -> SERVER)
 ASMPTR NET_D2GS_CLIENT_SendPacketAfterChecks_Original = 0x52ae50, NET_D2GS_CLIENT_Send_Rejoin = 0x52ae62;
-ASMPTR pD2PacketsClientBuffer = 0x882b34;
+REMOTEREF(void*, pD2PacketsClientBuffer, 0x882b34);
 
 __declspec(naked) void* __stdcall NET_D2GS_CLIENT_Send_Relocated(size_t nSize, int Unused, BYTE* pBytes) {
+    // The reference stores the game's address; compare the game-owned pointer there.
     __asm {
         push ebp
         mov ebp, esp
-        cmp dword ptr[pD2PacketsClientBuffer], 0x0
+        mov eax, pD2PacketsClientBuffer
+        cmp dword ptr[eax], 0x0
         jnz back
         xor eax, eax
         pop ebp
@@ -164,6 +173,7 @@ namespace Template {
                 MemoryPatch(NET_MCP_CLIENT_IncomingPacketsHandler_Call) << CALL(NET_MCP_CLIENT_IncomingPacketsHandler_Replacement);
 
                 // D2GS
+                // Own the shared call site: logging and custom delivery use one dispatcher.
                 MemoryPatch(NET_D2GS_CLIENT_PacketHandle_to0xAF_Call) << CALL(NET_D2GS_CLIENT_PacketHandler_Replacement);
                 MemoryPatch(NET_D2GS_CLIENT_PacketHandle_from0xAF_Call1) << CALL(NET_D2GS_CLIENT_PacketHandler_Replacement);
                 MemoryPatch(NET_D2GS_CLIENT_PacketHandle_from0xAF_Call2) << CALL(NET_D2GS_CLIENT_PacketHandler_Replacement);

@@ -208,8 +208,9 @@ BOOL __fastcall GetItemName_Intercept(D2::Types::ItemUnit* item, wchar_t* wBuffe
     BOOL ret = GetItemName_Relocated(item, wBuffer, dwSize);
     DWORD sockets = D2::STATSEX_GetCurrentStat(item, 194, 0);
 
-    if (sockets > 0) {
-        wchar_t *tmpBuffer = new wchar_t[dwSize], *a = wBuffer;
+    if (ret && sockets > 0 && dwSize > 0) {
+        std::vector<wchar_t> tmpBuffer(dwSize);
+        wchar_t* a = wBuffer;
 
         while (*a != L'\0' && *a != L'\n') {
             a++;
@@ -217,12 +218,12 @@ BOOL __fastcall GetItemName_Intercept(D2::Types::ItemUnit* item, wchar_t* wBuffe
 
         if (*a == L'\n') {
             *a++ = L'\0';
-            swprintf_s(tmpBuffer, dwSize, L"%ls (%d)\n%ls", wBuffer, sockets, a);
-            wcscpy_s(wBuffer, dwSize, tmpBuffer);
+            swprintf_s(tmpBuffer.data(), dwSize, L"%ls (%d)\n%ls", wBuffer, sockets, a);
+            wcscpy_s(wBuffer, dwSize, tmpBuffer.data());
         }
         else {
-            swprintf_s(tmpBuffer, dwSize, L"%ls (%d)", wBuffer, sockets);
-            wcscpy_s(wBuffer, dwSize, tmpBuffer);
+            swprintf_s(tmpBuffer.data(), dwSize, L"%ls (%d)", wBuffer, sockets);
+            wcscpy_s(wBuffer, dwSize, tmpBuffer.data());
         }
     }
 

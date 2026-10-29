@@ -44,7 +44,8 @@ namespace CustomFlyingTextPacket {
         }
 
         void clientGetCustomData(char* pBytes, int nSize) {
-            if (pBytes[0] == FLYING_TEXT_PACKET_ID && Settings["infoPopups"]) {
+            if (nSize >= 0 && CustomPackets::IsCompletePayload(pBytes, nSize,
+                FLYING_TEXT_PACKET_ID, sizeof(FlyingTextPacket)) && Settings["infoPopups"]) {
                 FlyingTexts.push_back(FlyingText((FlyingTextPacket*)pBytes));
             }
         }

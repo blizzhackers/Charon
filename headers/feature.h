@@ -28,7 +28,6 @@ typedef std::vector<AutomapInfoCallback> AutomapInfoCallbackList;
 class Feature {
 public:
 	Feature* next;
-	std::vector<std::string> mpq;
 	Feature();
 	~Feature();
 	virtual void init();

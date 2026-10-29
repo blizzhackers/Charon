@@ -2,7 +2,7 @@
 
 This is an experiment and utility for Diablo 2. It is intended for single player and TCP/IP game use, so connections to Battle.net are disabled. It's main features include:
 
-    Always in Direct 3D Mode with Alt+Enter fullscreen toggle.
+    Native OpenGL rendering with windowed/fullscreen switching and screen filters.
     Ladder Runewords, Cube Recipes, and Unique Items in Single Player and TCP/IP
     Uber Tristram and Diablo Clone in Single Player and TCP/IP
     Gently Improved Drop Rates with Respect to Single Player
@@ -24,8 +24,22 @@ This is an experiment and utility for Diablo 2. It is intended for single player
 
 Almost all features are optional now! Press F11 while Diablo 2 is running to enable/disable these options!
 
-A note about 'Always in Direct 3D Mode':
-    This feature causes the game to ignore command line flags that control the video, such as `-w`. The game now starts windowed every time, and you can toggle full screen mode on and off by holding Alt and pressing Enter (Alt+Enter). We're currently trying to understand how the game uses the rendering API, and we'll be looking to update the renderer to newer APIs, since the game currently uses DirectDraw v7 and Direct3D v3.
+Charon uses its native OpenGL renderer regardless of video command line flags such as `-w`.
+Use **Display Mode** in the F11 settings window or **Alt+Enter** to switch between
+windowed and borderless fullscreen. The selection is saved; the initial default is
+fullscreen. **OpenGL Filter** offers Nearest, Bilinear + CAS, Jinc2, xBRZ, ScaleFX, CRT, CRT Curved, and LCD.
+ScaleFX reconstructs pixel-art edges at 3x resolution before scaling to the window.
+CRT adds pronounced scanlines, a coarse phosphor mask, horizontal color bleed,
+highlight glow, and darker screen edges with brightness compensation. CRT Curved
+adds screen bowing while keeping the full frame visible and mouse input aligned.
+Both CRT options use a matched 2.2 transfer curve, neutral color balance, and soft
+highlight rolloff while retaining the established midtone brightness.
+LCD emulates a 1024x768 desktop panel with scaler softness, a six-bit + FRC color
+ramp, top-to-bottom TN gamma shift, faint RGB pixel structure, and uneven backlighting.
+Its transition-dependent settling is modestly faster than the initial LCD preset.
+It uses a fixed nominal 4 ms modern LED-backlit LCD baseline to approximate the
+extra response, with no per-monitor calibration. Trails follow elapsed time and
+reset when switching modes; FRC phases are averaged to reduce low-frame-rate shimmer.
 
 # Instructions
 
@@ -43,5 +57,24 @@ Note: Do not try to run Charon with any other Diablo 2 modifications. It will mo
 To use Charon you'll need to compile it with Visual Studio 2019. Once you've compiled Charon you must load Charon.dll into the game using [DLL Loader](https://github.com/Nishimura-Katsuo/DLLLoader). Loading it with traditional injection techniques may work, but will most likely crash or not function properly, since this is written to operate completely on Diablo 2's main thread for stability.
 
 A lot of hard work is being put in by us at [Blizzhackers](https://github.com/blizzhackers) to bring you this tool with love.
+
+Release optimization is intentionally disabled: the assembly hooks and indirect game
+callbacks rely on code paths that compiler/linker elimination can remove. Keep compiler
+optimization, whole-program optimization, reference elimination, and identical-code
+folding disabled for the DLL. Standalone renderer tests may use optimization.
+
+CI intentionally builds and packages the DLL; regression tests run locally. With CMake
+available in a Visual Studio developer shell, run:
+
+```powershell
+cmake -S . -B work/local-build -A Win32 -DCHARON_BUILD_OPENGL_TESTS=ON -DCHARON_BUILD_LOCAL_TESTS=ON
+cmake --build work/local-build --config Debug --parallel
+ctest --test-dir work/local-build -C Debug --output-on-failure
+cmake --build work/local-build --config Release --parallel
+ctest --test-dir work/local-build -C Release --output-on-failure
+```
+
+Renderer checks require a working OpenGL 3.3 driver. Charon initializes on the game's
+main thread before archives and rendering start and stays loaded until process exit.
 
 >I see him there at the oars of his little boat in the lake, the ferryman of the dead, Charon, with his hand upon the oar and he calls me now. ~Alcestis (from Alcestis by Euripides)
