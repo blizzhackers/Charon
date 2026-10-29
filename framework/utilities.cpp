@@ -10,8 +10,6 @@
 #include <unordered_map>
 #include <random>
 
-REMOTEFUNC(void __stdcall, D2GFX_DrawLine, (int X1, int Y1, int X2, int Y2, DWORD dwColor, DWORD dwAlpha), 0x4F6380)
-REMOTEFUNC(void __stdcall, D2GFX_DrawSolidRectAlpha, (int X1, int Y1, int X2, int Y2, DWORD dwColor, DWORD dwAlpha), 0x4F6340)
 REMOTEFUNC(long __fastcall, DRAW_GetWorldOffsetX, (), 0x45AFC0)
 REMOTEFUNC(long __fastcall, GetMouseYOffset, (), 0x45AFB0)
 REMOTEREF(POINT, nAutoMapScrollX, 0x7A5198)
@@ -52,7 +50,7 @@ void DrawRectangle(POINT a, POINT b, DWORD dwColor) {
         a.y >= 0 && a.y < D2::ScreenHeight ||
         b.y >= 0 && b.y < D2::ScreenHeight
     ) {
-        D2GFX_DrawSolidRectAlpha(a.x, a.y, b.x, b.y, dwColor, 0xFF);
+        D2::D2GFX_DrawSolidRectAlpha(a.x, a.y, b.x, b.y, dwColor, 0xFF);
     }
 }
 
@@ -63,7 +61,7 @@ void DrawLine(POINT a, POINT b, DWORD dwColor) {
         a.y >= 0 && a.y < D2::ScreenHeight ||
         b.y >= 0 && b.y < D2::ScreenHeight
     ) {
-        D2GFX_DrawLine(a.x, a.y, b.x, b.y, dwColor, 0xFF);
+        D2::D2GFX_DrawLine(a.x, a.y, b.x, b.y, dwColor, 0xFF);
     }
 }
 

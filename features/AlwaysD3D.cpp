@@ -12,16 +12,11 @@ REMOTEREF(DWORD, RENDERER_nWindowHeight, 0x7c913c);
 REMOTEREF(DWORD, ScreenSizeX, 0x71146c);
 REMOTEREF(DWORD, ScreenSizeY, 0x711470);
 REMOTEREF(DWORD, nScreenMode, 0x7a5218);
-REMOTEREF(DWORD, gnPanelOffsetX, 0x7a2858);
-REMOTEREF(BOOL, bAspect, 0x72da7c);
 REMOTEREF(LPDIRECTDRAW7, g_pDirectDraw7, 0x970e60);
-REMOTEREF(LPDIRECT3D3, g_pDirect3D7, 0x970e64);
 REMOTEREF(LPDIRECTDRAWSURFACE7, g_pD3DSurfaceBackbuffer, 0x970e68);
 REMOTEREF(LPDIRECTDRAWSURFACE7, D3DSurfaceSecondary, 0x970e6c);
 REMOTEREF(LPDIRECT3DDEVICE3, g_pD3DDevice, 0x970e78);
 REMOTEREF(LPDIRECT3DVIEWPORT3, g_pD3DViewport, 0x970e7c);
-REMOTEREF(DWORD, eD2GSGameType_007a0610, 0x7a0610);
-REMOTEPTR(DWORD, g_nCurrentTextureOpMode, 0x970e54);
 REMOTEFUNC(void, RENDERER_D3D_InitGroundTileCache, (), 0x6b8f10);
 
 LPDIRECTDRAWSURFACE7 D3DSurfaceBackground = nullptr;
@@ -133,7 +128,7 @@ void ClearScreen() {
 // D2 doesn't do a great job at it by default, so we're helping out.
 void throttle() {
     // Single player doesn't need throttling. It runs at 25 fps already.
-    if (State["inGame"] && eD2GSGameType_007a0610 < 1) {
+    if (State["inGame"] && D2::eD2GSGameType_007a0610 == 0) {
         return;
     }
 

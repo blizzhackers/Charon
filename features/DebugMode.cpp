@@ -12,7 +12,6 @@
 const wchar_t* align[] = { L"Hostile", L"Neutral", L"Friendly" };
 const DWORD alignColors[] = { 1, 5, 2 };
 
-ASMPTR DEBUGPRINT = 0x8846DC;
 REMOTEFUNC(void __fastcall, dFloorDraw, (void* unknown), 0x4DED10);
 
 void __fastcall _drawFloor(void* unknown) {
@@ -247,7 +246,8 @@ namespace DebugMode {
         void gameUnitPostDraw() {
             if (Settings["debugMode"]) {
                 wchar_t msg[512];
-                DWORD fontNum = 12, width = 0, height = 0;
+                DWORD fontNum = 12;
+                int width = 0, height = 0;
                 POINT pos;
                 D2::SetAndReturnLastFont(fontNum);
 
@@ -261,7 +261,7 @@ namespace DebugMode {
                     dpos.DrawWorldX(0x69);
                     pos = dpos.toScreen();
                     swprintf_s(msg, L"%d", unit->dwTxtFileNo);
-                    height = D2::TEXT_CalcTextDimensions(msg, &width, &fontNum);
+                    D2::TEXT_CalcTextDimensions(msg, &width, &height);
                     D2::DRAW_text(msg, pos.x - (width >> 1) - 4, pos.y - height + 8, 8, 1);
                 }
 
@@ -296,12 +296,12 @@ namespace DebugMode {
 
                         if (pos.x >= 0 && pos.y >= 0 && pos.x < D2::ScreenWidth && pos.y < D2::ScreenHeight) {
                             swprintf_s(msg, L"%d", unit->dwTxtFileNo);
-                            height = D2::TEXT_CalcTextDimensions(msg, &width, &fontNum);
+                            D2::TEXT_CalcTextDimensions(msg, &width, &height);
                             D2::DRAW_text(msg, pos.x - (width >> 1), pos.y + height + 2, alignColors[D2::STATSEX_GetCurrentStat(unit, 172, 0)], 0);
 
                             if (unit->pMonsterData->fSuper) {
                                 swprintf_s(msg, L"%d", unit->pMonsterData->wUniqueNo);
-                                height = D2::TEXT_CalcTextDimensions(msg, &width, &fontNum);
+                                D2::TEXT_CalcTextDimensions(msg, &width, &height);
                                 D2::DRAW_text(msg, pos.x + 8, pos.y + 5, 3, 0);
                             }
                         }
@@ -315,7 +315,7 @@ namespace DebugMode {
                             dpos.DrawWorldX(0x84);
                             POINT wpos = dpos.toScreen();
                             swprintf_s(msg, L"%d", unit->dwTxtFileNo);
-                            height = D2::TEXT_CalcTextDimensions(msg, &width, &fontNum);
+                            D2::TEXT_CalcTextDimensions(msg, &width, &height);
                             D2::DRAW_text(msg, wpos.x - (width >> 1) - 4, wpos.y + height + 2, 2, 1);
                         }
                     }

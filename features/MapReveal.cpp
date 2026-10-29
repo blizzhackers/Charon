@@ -12,7 +12,6 @@
 #include <vector>
 #include <cmath>
 
-REMOTEFUNC(DWORD __stdcall, AUTOMAP_GetMiniMapType, (void), 0x45A710);
 REMOTEFUNC(D2::Types::AutomapCell* __fastcall, AUTOMAP_AllocCell, (), 0x457C30);
 REMOTEFUNC(void __fastcall, AUTOMAP_InsertCellIntoTree, (D2::Types::AutomapCell* aCell, D2::Types::AutomapCell** node), 0x457B00);
 REMOTEFUNC(void __stdcall, AUTOMAP_RevealRoom, (D2::Types::Room1* pRoom1, DWORD dwClipFlag, D2::Types::AutomapLayer* aLayer), 0x458F40);
@@ -45,14 +44,14 @@ D2::Types::Room2* GetFirstTileOtherRoom(D2::Types::Room2* room2, DWORD num) {
     return nullptr;
 }
 
-REMOTEFUNC(void __stdcall, D2GFX_DrawSprite6, (D2::Types::DC6Context *pDC6Context, DWORD x, DWORD y, RECT *clipRect, DWORD bright), 0x4f6510);
 
 void DrawWarpText(DPOINT pos, DWORD levelno, bool isScreen = false) {
     POINT apos = isScreen ? pos.toScreen() : pos.toAutomap();
-    DWORD width = 0, height = 0, fontNum = 6;
+    int width = 0, height = 0;
+    DWORD fontNum = 6;
     wchar_t* levelNameUnicode = D2::TXT_Levels_GetLine(levelno)->wName;
     D2::SetAndReturnLastFont(fontNum);
-    height = D2::TEXT_CalcTextDimensions(levelNameUnicode, &width, &fontNum);
+    D2::TEXT_CalcTextDimensions(levelNameUnicode, &width, &height);
     int offsetx = 8 - ((int)width / 2), offsety = -16;
     D2::DRAW_text(levelNameUnicode, apos.x + offsetx, apos.y + offsety, 0, false);
 }
@@ -135,8 +134,6 @@ public:
                         if (EnsureRoom(room2)) {
                             AUTOMAP_RevealRoom(room2->pRoom1, TRUE, revealdata[level->dwLevelNo].layer);
                             DrawPresets(room2, revealdata[level->dwLevelNo].layer);
-                            // Not sure that we need to unload the room again... we're going to need it again later.
-                            // D2::RemoveRoomData(room2->pLevel->pMisc->pAct, room2->pLevel->dwLevelNo, room2->dwPosX, room2->dwPosY, room2->pRoom1);
                         }
                     }
 

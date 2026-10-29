@@ -98,22 +98,8 @@ union GameFlagsType {
     } flags;
 };
 
-REMOTEFUNC(void __stdcall, GetCoords, (D2::Types::UnitAny* pUnit, POINT* pPoint), 0x620870);
-REMOTEFUNC(void __fastcall, FindSpawnableLocation, (D2::Types::Room1* pDrlgRoom, POINT* pos, DWORD param_1_00, DWORD param_2_00, D2::Types::Room1** pRoomsNear, DWORD param_6, int param_7), 0x545340);
-REMOTEFUNC(BOOL __stdcall, SetupUpdateFlag, (D2::Types::UnitAny* pUnit, DWORD dwMode), 0x624690);
-REMOTEFUNC(DWORD __fastcall, LinkPortal, (void* ptGame, int unused, D2::Types::UnitAny* ptObject, DWORD levelEndID, DWORD levelStartID), 0x56CF40);
-REMOTEFUNC(void __stdcall, SetObjectPortalFlags, (D2::Types::UnitAny* ptObject, BYTE flags), 0x622300);
-REMOTEFUNC(BYTE __stdcall, GetObjectPortalFlags, (D2::Types::UnitAny* ptObject), 0x6222C0);
-REMOTEFUNC(void __stdcall, ToggleHasPortalFlagRoom, (D2::Types::Room1* param_1, DWORD flag), 0x61AED0);
-REMOTEFUNC(D2::Types::UnitAny* __fastcall, SpawnUniquePack, (IncompleteGameData* pGame, D2::Types::Room1* pRoom, BOOL zero, DWORD dwClassId, void* subtiles, int x, int y, BOOL flag), 0x5A43E0);
 REMOTEFUNC(D2::Types::UnitAny* __fastcall, SERVER_SpawnMonster, (IncompleteGameData* pGame, D2::Types::Room1* pRoom, int x, int y, DWORD dwClassId, DWORD guid, DWORD seed, BOOL isChampion, BOOL isSuperUnique, DWORD superUniqueId, const char (&mods)[9]), 0x5A4440);
 REMOTEFUNC(void __fastcall, SpawnMonsterAtRoomPos, (IncompleteGameData* pGame, D2::Types::Room1* pRoom, int32_t x, int32_t y, DWORD dwClassId, DWORD dwMode, DWORD dwUnkOne, DWORD dwUnkZero), 0x5b2f20);
-REMOTEFUNC(DWORD __fastcall, SERVER_SpawnPortal, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, D2::Types::Room1* pDrlgRoom, int nX, int nY, DWORD eD2LevelId, D2::Types::UnitAny** param_7, int nClassId, DWORD param_9), 0x56D130);
-REMOTEFUNC(void __fastcall, SpawnPortal, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, DWORD LevelId), 0x5A9930);
-REMOTEFUNC(DWORD __stdcall, GetActNoFromLevelNumber, (int levelId), 0x6427f0);
-REMOTEFUNC(char* __stdcall, TC_GetParsedTreasureClassByLevel, (WORD nTreasureClass, int level), 0x654E00);
-REMOTEFUNC(void __fastcall, SERVER_ITEM_RollItemToDrop, (IncompleteGameData* pGame, D2::Types::UnitAny* pVictim, D2::Types::UnitAny* pAttacker, char* pTCData, int param_5, int level, bool bIsItemFindDrop, D2::Types::UnitAny** pUnitTable, void* pUnitIndex, int param_10), 0x55A6D0);
-REMOTEFUNC(void __fastcall, SpawnDrop, (IncompleteGameData* game, D2::Types::UnitAny* pUnit, DWORD dwItemCode, D2::ItemQuality nType), 0x585970);
 REMOTEFUNC(D2::Types::UnitAny* __fastcall, ITEM_CreateItemInstance, (IncompleteGameData* pGame, ItemGenerationData* pItemUnkownServer, int probablyZero), 0x558D90);
 REMOTEFUNC(D2::Types::Room1* __fastcall, FindBestSpotToSpawnItem, (D2::Types::Room1* pDrlgRoom, POINT* pUnitPosition, POINT* pNewPosition, WORD param_2_00, BYTE param_5), 0x555DA0);
 REMOTEFUNC(DWORD __stdcall, TXT_Items_ConvertItemCodeToItemClassId, (DWORD dwItemCode), 0x633680);
@@ -125,9 +111,9 @@ REMOTEFUNC(void __fastcall, AITHINK_Fn1_Mephisto, (IncompleteGameData* pGame, D2
 REMOTEFUNC(void __fastcall, AITHINK_Fn1_Diablo, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, D2::Types::AIParams* pAiParams), 0x5E9170);
 REMOTEFUNC(void __fastcall, AI_Fn1_BaalCrab, (IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, D2::Types::AIParams* pAiParams), 0x5FCFE0);
 
-ASMPTR UberBaalAIPointer = 0x73D330, AI_Fn1_UberBaal = 0x5FD200;
-ASMPTR UberMephAIPointer = 0x73D340, AITHINK_Fn1_UberMephisto = 0x5F81C0;
-ASMPTR UberDiabloAIPointer = 0x73D350, AITHINK_Fn1_UberDiablo = 0x05E9DF0;
+ASMPTR AI_Fn1_UberBaal = 0x5FD200;
+ASMPTR AITHINK_Fn1_UberMephisto = 0x5F81C0;
+ASMPTR AITHINK_Fn1_UberDiablo = 0x05E9DF0;
 
 ASMPTR CUBE_SpecialOutput_Unused2 = 0x565a90, CUBE_SpecialOutput_Unused3 = 0x565aa0;
 ASMPTR SERVER_KillMonster_Original = 0x57CCB0, KillMonster_Rejoin = 0x57CCB6;
@@ -148,7 +134,7 @@ std::vector<const char*> keyCodes = {
 };
 
 DWORD GetActFromRoom(D2::Types::Room1* a) {
-    return GetActNoFromLevelNumber(a->pRoom2->pLevel->dwLevelNo);
+    return D2::GetActNoFromLevelNumber(a->pRoom2->pLevel->dwLevelNo);
 }
 
 D2::Types::UnitAny* PortalTo(IncompleteGameData* pGame, D2::Types::UnitAny* pUnit, int levelId, bool isBlue = false) {
@@ -156,10 +142,10 @@ D2::Types::UnitAny* PortalTo(IncompleteGameData* pGame, D2::Types::UnitAny* pUni
     D2::Types::Room1* target;
     POINT pos;
 
-    if (GetActFromRoom(pUnit->pPath->pRoom1) == GetActNoFromLevelNumber(levelId)) {
-        GetCoords(pUnit, &pos);
-        FindSpawnableLocation(pUnit->pPath->pRoom1, &pos, 3, 0x400, &target, 4, 100);
-        SERVER_SpawnPortal(pGame, nullptr, target, pos.x, pos.y, levelId, &pPortal, isBlue ? 0x3b : 0x3c, 0);
+    if (GetActFromRoom(pUnit->pPath->pRoom1) == D2::GetActNoFromLevelNumber(levelId)) {
+        D2::GetCoords(pUnit, &pos);
+        D2::FindSpawnableLocation(pUnit->pPath->pRoom1, &pos, 3, 0x400, &target, 4, 100);
+        D2::SERVER_SpawnPortal(pGame, nullptr, target, pos.x, pos.y, levelId, &pPortal, isBlue ? 0x3b : 0x3c, 0);
         if (pPortal) pPortal->pObjectData->Type = (BYTE) levelId;
         return pPortal;
     }
@@ -247,7 +233,7 @@ D2::Types::UnitAny* SpawnItem(IncompleteGameData* pGame, D2::Types::UnitAny* pVi
     ItemGenerationData pItemGen = { 0 };
     POINT pos, newPos;
 
-    GetCoords(pVictim, &pos);
+    D2::GetCoords(pVictim, &pos);
     pItemGen.pDrlgRoom = FindBestSpotToSpawnItem(pVictim->pPath->pRoom1, &pos, &newPos, 1, 1);
     pItemGen.wItemFormat = pGame->wItemFormat;
     pItemGen.nItemClassId = TXT_Items_ConvertItemCodeToItemClassId(*(DWORD*)szItemCode);

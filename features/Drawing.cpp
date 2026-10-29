@@ -11,7 +11,6 @@
 #include <iostream>
 
 REMOTEFUNC(void __fastcall, AUTOMAP_Draw, (), 0x45ad60);
-REMOTEFUNC(void __fastcall, DRAW_UI_Sprites, (), 0x4F9870);
 REMOTEREF(D2::Types::RendererFunctionsStrc*, RENDERER_CurrentRenderedFunctions, 0x7c8cc0);
 REMOTEFUNC(void, DrawCursor, (), 0x4684C0);
 REMOTEFUNC(void, DrawCursorOOG, (), 0x4F97E0);
@@ -58,7 +57,6 @@ void oogDraw() {
     }
     D2::SetAndReturnLastFont(old);
     DrawCursorOOG();
-    // Since we patch to override DRAW_UI_Sprites, we need to call it ourselves.
 }
 REMOTEFUNC(unsigned int __stdcall, DRAW_GetTypeOfBorder,(void),0x45ae90);
 
@@ -99,7 +97,6 @@ void _allFinalDraw() {
     RENDERER_CurrentRenderedFunctions->fpEndScene();
 }
 
-REMOTEFUNC(float, D2GFX_CalculateGammaRamp, (), 0x4f6130);
 
 // This feature class registers itself.
 class : public Feature {

@@ -6,8 +6,8 @@
 
 using namespace Ghidra;
 
-REMOTEFUNC(BOOL __stdcall, ITEM_EditItemData_eItemFlag, (D2UnitStrc* pItem, eD2ItemFlag eItemFlag, BOOL bSet), 0x6280d0);
-REMOTEFUNC(void __fastcall, SERVER_PickToCursor, (D2GameStrc* pGame, D2UnitStrc* pPlayer, DWORD nItemGUID, int* param_2_00), 0x55cf50)
+// Game.exe 0x6280d0 updates flags; its EAX value is incidental.
+REMOTEFUNC(void __stdcall, ITEM_EditItemData_eItemFlag, (D2UnitStrc* pItem, eD2ItemFlag eItemFlag, BOOL bSet), 0x6280d0);
 
 ASMPTR NET_D2GS_SERVER_Send_0x9C_ITEMEX_original = 0x53eae0, NET_D2GS_SERVER_Send_0x9C_ItemWorld_rejoin = 0x53eae9;
 

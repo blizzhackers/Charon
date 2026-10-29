@@ -186,10 +186,10 @@ void TextElement::draw(int ox, int oy) {
 
     Element::drawFrame(ox, oy);
 
-    DWORD fileno = font, w = 0, h = 0;
+    int w = 0, h = 0;
     std::wstring message = textCallback();
-    D2::SetAndReturnLastFont(fileno);
-    h = D2::TEXT_CalcTextDimensions(message.c_str(), &w, &fileno);
+    D2::SetAndReturnLastFont(font);
+    D2::TEXT_CalcTextDimensions(message.c_str(), &w, &h);
     int cy = (pos.top + pos.bottom + h) / 2;
 
     switch (orientation) {

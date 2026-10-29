@@ -68,7 +68,9 @@ namespace CustomFlyingTextPacket {
                 std::wstring currentText = symbol + numberStr;
                 POINT pos = current->pos.toScreen();
 
-                DWORD fontno = current->font, old = D2::SetAndReturnLastFont(fontno), width, height = D2::TEXT_CalcTextDimensions(currentText.c_str(), &width, &fontno);
+                DWORD old = D2::SetAndReturnLastFont(current->font);
+                int width, height;
+                D2::TEXT_CalcTextDimensions(currentText.c_str(), &width, &height);
                 D2::DRAW_text(currentText.c_str(), pos.x + (int)ox - (int)(width / 2), pos.y - (int)oy - (height / 2), current->color, false);
                 D2::SetAndReturnLastFont(old);
             }

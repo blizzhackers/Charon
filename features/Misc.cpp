@@ -163,12 +163,13 @@ void SplashScreenHook() {
 
 static DWORD automapTextOffset = 0;
 void _drawAutoMapInfo(DWORD size) {
-    DWORD width = 0, height = 0, fileno = 1;
-    height = D2::TEXT_CalcTextDimensions(L"test", &width, &fileno);
+    int width = 0, height = 0;
+    D2::TEXT_CalcTextDimensions(L"test", &width, &height);
     DWORD bottom = AUTOMAP_TextHeightOffset - height;
     for (AutomapInfoCallback func : AutomapInfoHooks) {
         std::wstring msg = func();
-        bottom += D2::TEXT_CalcTextDimensions(msg.c_str(), &width, &fileno);
+        D2::TEXT_CalcTextDimensions(msg.c_str(), &width, &height);
+        bottom += height;
         D2::DRAW_text(msg.c_str(), D2::ScreenWidth - 16 - width, bottom, 4, 0);
     }
     automapTextOffset = bottom;
@@ -248,11 +249,10 @@ void __fastcall GetItemDescription(wchar_t* wBuffer) {
 }
 
 ASMPTR ItemDescription_Patches[] = { 0x48ED2F, 0x48E39C, 0x48DB1D };
-REMOTEFUNC(void __fastcall, TEXT_CalcTextDimensions, (wchar_t* wBuffer, long* x, long* y), 0x502520);
 
-void __fastcall ItemDescription_Hook(wchar_t* wBuffer, long *x, long *y) {
+void __fastcall ItemDescription_Hook(wchar_t* wBuffer, int *x, int *y) {
     GetItemDescription(wBuffer);
-    TEXT_CalcTextDimensions(wBuffer, x, y);
+    D2::TEXT_CalcTextDimensions(wBuffer, x, y);
 }
 
 [[maybe_unused]] int
@@ -437,8 +437,8 @@ public:
     }
 
     void oogPostDraw() {
-        DWORD width = 0, height = 0, fileno = 1;
-        height = D2::TEXT_CalcTextDimensions(version.c_str(), &width, &fileno);
+        int width = 0, height = 0;
+        D2::TEXT_CalcTextDimensions(version.c_str(), &width, &height);
         D2::DRAW_text(version.c_str(), D2::ScreenWidth - width - 5, D2::ScreenHeight - 5, 4, 0);
     }
 

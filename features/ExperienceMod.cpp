@@ -3,12 +3,13 @@
 #include "headers/hook.h"
 #include "headers/remote.h"
 #include "headers/ghidra.h"
+#include "headers/experience.h"
 
 Ghidra::D2UnitStrc* pLastVictim;
 
 REMOTEREF(DWORD, PlayerCountOverride, 0x883d70);
-REMOTEFUNC(DWORD __fastcall, CALC_Experience, (Ghidra::D2UnitStrc* pUnit, int dummy, Ghidra::D2GameStrc* pGame, unsigned int param_3), 0x57e3f0)
-REMOTEFUNC(Ghidra::D2ClientStrc* __stdcall, SUNIT_GetClient, (Ghidra::D2UnitStrc* pUnit), 0x5531c0)
+DWORD CALC_Experience = 0x57e3f0;
+REMOTEFUNC(Ghidra::D2ClientStrc* __fastcall, SUNIT_GetClient, (Ghidra::D2UnitStrc* pUnit, const char* szFile, int nLine), 0x5531c0)
 REMOTEFUNC(void __fastcall, SERVER_KillExperience, (Ghidra::D2GameStrc* pGame, Ghidra::D2UnitStrc* pAttacker, Ghidra::D2UnitStrc* pVictim), 0x57e990)
 
 void __fastcall SERVER_KillExperience_intercept(Ghidra::D2GameStrc* pGame, Ghidra::D2UnitStrc* pAttacker, Ghidra::D2UnitStrc* pVictim) {
@@ -23,9 +24,7 @@ void __fastcall SetPlayerCount(DWORD count) {
     SaveSettings();
 }
 
-DWORD __fastcall ExperienceIntercept(Ghidra::D2UnitStrc* pUnit, int dummy, Ghidra::D2GameStrc* pGame, unsigned int param_3) {
-    DWORD exp = CALC_Experience(pUnit, dummy, pGame, param_3);
-
+DWORD __stdcall ApplyExperienceBonus(DWORD exp, Ghidra::D2UnitStrc* pUnit, Ghidra::D2GameStrc* pGame) {
     if (Settings["xpMin"] <= 8000) {
         exp *= Settings["xpBonus"];
 
@@ -76,7 +75,7 @@ namespace ExperienceMod {
 
         void serverExpAward(DWORD exp, Ghidra::D2UnitStrc* pUnit, Ghidra::D2GameStrc* pGame) {
             if (pUnit->eUnitType == Ghidra::UNIT_PLAYER && Settings["infoPopups"]) {
-                Ghidra::D2ClientStrc* pClient = SUNIT_GetClient(pUnit);
+                Ghidra::D2ClientStrc* pClient = SUNIT_GetClient(pUnit, __FILE__, __LINE__);
 
                 if (pClient != nullptr) {
                     FlyingTextPacket packet;

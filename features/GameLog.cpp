@@ -4,8 +4,6 @@
 #include "headers/remote.h"
 #include <list>
 
-REMOTEFUNC(void __fastcall, TEXT_PrintGameString, (const wchar_t* wMessage, int nColor), 0x49E3A0)
-REMOTEFUNC(void __fastcall, TEXT_PrintPartyMessage, (const wchar_t* wMessage, int nColor), 0x49E5C0) // Updated 1.14d //0049E5C0-BASE
 REMOTEREF(DWORD, gnBorderType, 0x07a5210);
 
 struct GameLogMessage {
@@ -87,7 +85,8 @@ namespace GameLog {
 
         void showMessages(bool lower) {
             int top = lower ? 0x5f : 10, left = 15;
-            DWORD height = 0, width = 0, fontno = 13;
+            int height = 0, width = 0;
+            DWORD fontno = 13;
             int space = -8;
 
             if (gnBorderType == 2) {
@@ -109,7 +108,7 @@ namespace GameLog {
             D2::SetAndReturnLastFont(fontno);
 
             for (GameLogMessage message : GameLogMessages) {
-                height = D2::TEXT_CalcTextDimensions(message.text.c_str(), &width, &fontno);
+                D2::TEXT_CalcTextDimensions(message.text.c_str(), &width, &height);
                 D2::DRAW_text(message.text.c_str(), left, top += (height + space), 0, 0);
             }
         }
