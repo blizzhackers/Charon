@@ -113,6 +113,8 @@ jobs:
           cp stage/dll/Charon.dll "${dist}/Charon.dll"
           cp stage/loader/dbghelp.dll "${dist}/dbghelp.dll"
           cp readme.md "${dist}/readme.md"
+          cp -r scripts "${dist}/scripts"
+          cp third_party/luajit/upstream/COPYRIGHT "${dist}/LuaJIT-COPYRIGHT.txt"
 
           ( cd "${dist}" && sha256sum Charon.dll dbghelp.dll > SHA256SUMS.txt )
 

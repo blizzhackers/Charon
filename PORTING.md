@@ -33,7 +33,7 @@ User decisions:
 
 ## Inputs and platform
 
-- Original executable: `D:\Diablo II\Game.exe`, read only.
+- Original executable: the local Diablo II 1.14d `Game.exe`, read only.
 - SHA-256: `631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf`.
 - Revision: project and Redivivus identify Windows Diablo II 1.14d; the file hash
   above identifies the exact local input. No independent dump-list check yet.
@@ -341,7 +341,7 @@ From a Visual Studio 2022 developer shell, configure with:
 
 ```powershell
 cmake -S . -B ../Charon-build-opengl -G "Visual Studio 17 2022" -A Win32 -T v143 `
-  -DCHARON_BUILD_OPENGL_TESTS=ON '-DCHARON_ORIGINAL_GAME=D:\Diablo II\Game.exe'
+  -DCHARON_BUILD_OPENGL_TESTS=ON '-DCHARON_ORIGINAL_GAME=<Diablo II folder>\Game.exe'
 cmake --build ../Charon-build-opengl --config Debug --parallel 4
 ctest --test-dir ../Charon-build-opengl -C Debug --output-on-failure
 cmake --build ../Charon-build-opengl --config Release --parallel 4
@@ -381,8 +381,8 @@ Validation on 2026-10-29:
   A local check extracted the production selection helper/patch expression and
   ran the production MemoryPatch emitter against a synthetic allocated page;
   mode/config, exact 15-byte extent, untouched handler region, call/jump targets,
-  and restoration passed with `/RTC1`. The check is at
-  `D:\Charon-build-opengl\selection-check.cpp`. Live failure/activation paths
+  and restoration passed with `/RTC1`. The check lived
+  in the local build folder and is not committed. Live failure/activation paths
   remain untested. Both DLL configurations rebuilt after these corrections.
 
 ## Outstanding integration evidence

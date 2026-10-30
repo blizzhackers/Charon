@@ -21,6 +21,7 @@ This is an experiment and utility for Diablo 2. It is intended for single player
     Multiple Simultaneous Windows
     Fixed Unique Monster Color Bug
     Loading additional mpq via command line parameter: -mpq "filename.mpq"
+    YARB, a Lua scripting framework for menus and gameplay (see below)
 
 Almost all features are optional now! Press F11 while Diablo 2 is running to enable/disable these options!
 
@@ -51,6 +52,43 @@ reset when switching modes; FRC phases are averaged to reduce low-frame-rate shi
 Now you can run the game using the new shortcut and it will load Charon automatically!
 
 Note: Do not try to run Charon with any other Diablo 2 modifications. It will most likely crash!
+
+# YARB
+
+YARB (Yet Another Reason Bot) is Charon's scripting framework. It embeds LuaJIT and
+runs two scripts named on the command line: one for the menus, for the whole session,
+and one that loads fresh for each game:
+
+    Game.exe -loaddll Charon.dll -oogscript scripts\oog\create_character.lua -gamescript scripts\game\clear_blood_moor.lua
+
+Scripts never sleep or block. Charon calls `tick` 25 times a second, and longer
+behaviour is a state machine that advances one step per tick. Scripts read only
+what the game client knows and send only the requests the client itself sends, so
+they behave the same in single player and in TCP/IP games. The expensive work (path
+finding, level exploration, picking a safe spot in a fight) runs in C++. Scripts
+reload when their files change, so you can tweak a running bot without restarting
+the game.
+
+The included scripts:
+
+- `oog/create_character.lua` and `game/clear_blood_moor.lua` create a character and
+  clear the Blood Moor: a small example to start from.
+- `oog/campaign.lua` and `game/act1.lua` play one sorceress through Act 1, speedrun
+  style, across as many games as it takes. In testing it has taken a new character
+  all the way to Andariel's death.
+
+The reusable parts (movement, combat, looting, town services, stashing) live in
+`scripts/lib`. See [scripts/README.md](scripts/README.md) for the scripting API.
+
+YARB is a prototype. The API will change, the bot logic is rough around the edges,
+and plenty of the game is still unscripted. You are free to build on it: fork it,
+write your own bots, or improve the framework itself. We highly recommend vibe
+coding with Claude or GPT. Most of YARB was built that way, and
+[AGENTS.md](AGENTS.md) tells an AI agent how to work in this codebase: the rules,
+the build, how to add bindings, and how to test a bot in the live game.
+
+LuaJIT's FFI is off by default because it gives scripts unchecked memory access;
+pass `-luaffi` to allow `require 'ffi'`.
 
 # Compiling
 

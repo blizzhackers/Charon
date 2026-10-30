@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.15.0 FATAL_ERROR)
 
 set(CMAKE_SYSTEM_VERSION 10.0 CACHE STRING "" FORCE)
 
-project(Charon CXX)
+project(Charon C CXX)
 
 
 ################################################################################
@@ -137,8 +137,10 @@ set(ALL_FILES
 ################################################################################
 # Target
 ################################################################################
+add_subdirectory(third_party/luajit)
+
 add_library(${PROJECT_NAME} SHARED ${ALL_FILES})
-target_link_libraries(${PROJECT_NAME} Crypt32.lib)
+target_link_libraries(${PROJECT_NAME} Crypt32.lib luajit_static)
 
 use_props(${PROJECT_NAME} "${CMAKE_CONFIGURATION_TYPES}" "${DEFAULT_CXX_PROPS}")
 set(ROOT_NAMESPACE Charon)
@@ -225,6 +227,7 @@ if(MSVC)
             /INCREMENTAL:NO
         >
         /DEBUG;
+        /MAP;
         /SUBSYSTEM:WINDOWS
     )
 endif()
@@ -281,5 +284,26 @@ if(CHARON_BUILD_LOCAL_TESTS)
         add_test(NAME ${local_test} COMMAND ${local_test})
         set_tests_properties(${local_test} PROPERTIES TIMEOUT 45)
     endforeach()
+    add_executable(charon_pathfinding_test tests/pathfinding.cpp framework/pathfinding.cpp)
+    target_include_directories(charon_pathfinding_test PRIVATE "${CMAKE_SOURCE_DIR}")
+    target_compile_features(charon_pathfinding_test PRIVATE cxx_std_17)
+    if(MSVC)
+        target_compile_options(charon_pathfinding_test PRIVATE /W4 /EHsc /UNDEBUG /Od
+            $<$<CONFIG:Debug>:/RTC1>)
+    endif()
+    add_test(NAME charon_pathfinding_test COMMAND charon_pathfinding_test)
+    set_tests_properties(charon_pathfinding_test PROPERTIES TIMEOUT 45)
+    add_executable(charon_script_host_test tests/script_host.cpp framework/script_host.cpp)
+    target_include_directories(charon_script_host_test PRIVATE "${CMAKE_SOURCE_DIR}")
+    target_compile_features(charon_script_host_test PRIVATE cxx_std_17)
+    target_link_libraries(charon_script_host_test PRIVATE luajit_static)
+    set_target_properties(charon_script_host_test PROPERTIES MSVC_RUNTIME_LIBRARY
+        "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    if(MSVC)
+        target_compile_options(charon_script_host_test PRIVATE /W4 /EHsc /UNDEBUG /Od
+            $<$<CONFIG:Debug>:/RTC1>)
+    endif()
+    add_test(NAME charon_script_host_test COMMAND charon_script_host_test)
+    set_tests_properties(charon_script_host_test PROPERTIES TIMEOUT 45)
 endif()
 
