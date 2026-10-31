@@ -1,8 +1,5 @@
 #include "headers/common.h"
 #include "headers/feature.h"
-#include "headers/remote.h"
-#include "headers/D2Structs.h"
-#include <iostream>
 
 HotkeyCallbackMap HotkeyCallbacks;
 AutomapInfoCallbackList AutomapInfoHooks;
@@ -40,3 +37,4 @@ void Feature::serverExpAward(DWORD exp, Ghidra::D2UnitStrc* pUnit, Ghidra::D2Gam
 void Feature::valueFromServer(D2::Types::LivingUnit* unit, int value, char color) { }
 void Feature::serverGetCustomData(int clientId, char* pBytes, int nSize) { }
 void Feature::clientGetCustomData(char* pBytes, int nSize) { }
+Task::Task<> Feature::async() {co_return;}
