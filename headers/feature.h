@@ -10,6 +10,7 @@
 #include "utilities.h"
 #include "headers/D2Structs.h"
 #include "headers/ghidra.h"
+#include "headers/async.h"
 
 typedef std::wstringstream& InputStream;
 typedef std::function<BOOL(std::wstring, InputStream)> InputCallback;
@@ -53,6 +54,7 @@ public:
 	virtual void valueFromServer(D2::Types::LivingUnit* unit, int value, char color);
 	virtual void serverGetCustomData(int clientId, char *pBytes, int nSize);
 	virtual void clientGetCustomData(char* pBytes, int nSize);
+    virtual Task::Task<> async();
 };
 
 extern Feature* Features;

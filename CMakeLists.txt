@@ -209,7 +209,7 @@ if(MSVC)
             /GL-
         >
         /permissive-;
-        /std:c++17;
+        /std:c++20;
         /sdl;
         /W4;
         ${DEFAULT_CXX_DEBUG_INFORMATION_FORMAT};
