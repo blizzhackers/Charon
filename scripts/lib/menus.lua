@@ -58,6 +58,20 @@ local function entering()
   }
 end
 
+-- Before the main menu has been seen in this session, whatever else is on
+-- screen (the trademark screen) goes on at a key: waited out, it was nine
+-- seconds of every launch. Afterwards unknown screens are left alone, so a
+-- key cannot back out of a menu the script is in the middle of.
+local function hurry(m, screen)
+  if screen == 'main_menu' then store.set('menus.started', true) end
+  if screen ~= 'unknown' or store.get('menus.started') then return end
+  local t = charon.now()
+  if t - (m.data.hurried or 0) >= 500 then
+    m.data.hurried = t
+    oog.key(27)
+  end
+end
+
 -- Creates a single player character of `class` with a random name, publishes
 -- the name as store 'character' and enters the game.
 function menus.creator(class)
@@ -68,6 +82,7 @@ function menus.creator(class)
     navigate = {
       tick = function(m)
         local screen, controls = oog.screen(), oog.controls()
+        hurry(m, screen)
         if screen == 'main_menu' then
           local button = menus.by_role(controls, 'single_player')
           if button and menus.click(button, 'Single Player') then return 'settle', 'single player' end
@@ -115,12 +130,13 @@ function menus.enterer(name)
     navigate = {
       tick = function(m)
         local screen, controls = oog.screen(), oog.controls()
+        hurry(m, screen)
         if screen == 'main_menu' then
           local button = menus.by_role(controls, 'single_player')
           if button and menus.click(button, 'Single Player') then return 'settle', 'single player' end
         elseif screen == 'character_select' then
           local slot = menus.find(controls, function(c)
-            return c.role == 'character_slot' and c.text and c.text:find(name, 1, true)
+            return c.role == 'character_slot' and c.character_name == name
           end)
           if not slot then
             -- More characters than fit on screen are not scrolled to yet.

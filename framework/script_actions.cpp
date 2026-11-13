@@ -11,6 +11,8 @@
 #include "headers/remote.h"
 #include "headers/script_game.h"
 #include "headers/script_host.h"
+#include "headers/script_stat_requests.h"
+#include "headers/player_count.h"
 
 namespace ScriptActions {
 
@@ -74,6 +76,21 @@ int Coord(lua_State* L, int index) {
     const double value = Script::ArgNumber(L, index);
     if (value < 0 || value > 0xFFFF) throw Script::Error("coordinate out of range");
     return (int)value;
+}
+
+// act.players(count) -> bool: submit only the local /players command and confirm acceptance.
+int ActPlayers(lua_State* L) {
+    int count;
+    if (!CharonPlayers::ScriptCount(Script::ArgNumber(L, 1), count))
+        throw Script::Error("players count must be an integer from 1 to 8");
+    RequirePlayer();
+    if (!CharonPlayers::Supported(ClientGameType()))
+        throw Script::Error("players count requires a local game host");
+    CharonPlayers::Command command(count);
+    const uint32_t before = CharonPlayers::Configured().revision;
+    CharonPlayers::InvokeParser(0x47C420, command);
+    lua_pushboolean(L, CharonPlayers::Configured().Acknowledges(before, count));
+    return 1;
 }
 
 // act.move(x, y [, walk]) -> bool: path to the nearest reachable point and go.
@@ -161,21 +178,31 @@ int ActInteractNow(lua_State* L) {
     return 0;
 }
 
-// act.pickup(itemId | item [, toCursor])
+// act.pickup(itemId | item [, toCursor [, nearbyOnly]]) -> request sent
 int ActPickup(lua_State* L) {
-    RequirePlayer();
+    Unit* player = RequirePlayer();
     uint32_t type = UnitType::Item, guid;
     int next = 2;
     if (lua_type(L, 1) == LUA_TTABLE) next = ArgTarget(L, 1, type, guid);
     else guid = (uint32_t)Script::ArgNumber(L, 1);
     const bool toCursor = Script::OptBool(L, next, false);
-    if (type != UnitType::Item || !FindUnit(UnitType::Item, guid)) throw Script::Error("item not found");
+    const bool nearbyOnly = Script::OptBool(L, next + 1, false);
+    Unit* item = type == UnitType::Item ? FindUnit(UnitType::Item, guid) : nullptr;
+    if (!item) throw Script::Error("item not found");
+    // A distant/blocked 0x16 request starts a server-side approach. Check the
+    // shared range/collision rules against live client units before sending.
+    if (nearbyOnly && (item->mode != 3 || !UnitRoom(player) || !UnitRoom(item)
+        || UnitDistance(player, item) > 4 || InteractingCollision(player, item, 0x804))) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
     uint8_t packet[13] = { 0x16 };
     *reinterpret_cast<uint32_t*>(packet + 1) = UnitType::Item;
     *reinterpret_cast<uint32_t*>(packet + 5) = guid;
     *reinterpret_cast<uint32_t*>(packet + 9) = toCursor ? 1 : 0;
     SendPacket(packet, sizeof(packet));
-    return 0;
+    lua_pushboolean(L, true);
+    return 1;
 }
 
 // act.use_belt(slot [, mercenary]): slot 0..15; 0..3 is the bottom row.
@@ -191,16 +218,14 @@ int ActUseBelt(lua_State* L) {
 
 // act.add_stat(stat [, count]): 0 strength, 1 energy, 2 dexterity, 3 vitality.
 int ActAddStat(lua_State* L) {
-    RequirePlayer();
+    Unit* player = RequirePlayer();
     const int stat = Script::ArgInt(L, 1);
     int count = Script::OptInt(L, 2, 1);
     if (stat < 0 || stat > 3) throw Script::Error("stat must be 0..3");
-    while (count > 0) {
-        const int batch = count > 32 ? 32 : count;
-        const uint8_t packet[3] = { 0x3A, (uint8_t)stat, (uint8_t)(batch - 1) };
-        SendPacket(packet, sizeof(packet));
-        count -= batch;
-    }
+    // Stat 4 is the same client unspent-points stat exposed by game.me().
+    if (!Script::SendStatPoints(stat, count, GetUnitStat(player, 4, 0),
+        [](const uint8_t* packet, size_t size) { SendPacket(packet, (int)size); }))
+        throw Script::Error("count must be positive and no greater than unspent stat points");
     return 0;
 }
 
@@ -308,6 +333,71 @@ int ActPlaceItem(lua_State* L) {
     return 0;
 }
 
+// act.identify(item, scroll): read a scroll of identify on an item she
+// carries, as a click on the item does once the scroll has been picked
+// (the inventory's click handlers, 0x490FC0 and its kin: with the cursor in
+// mode 6 they send 0x27 with the item clicked and then the scroll). The
+// server wants an empty cursor. Scripts make sure the scroll is one.
+int ActIdentify(lua_State* L) {
+    Unit* player = RequirePlayer();
+    if (player->inventory && player->inventory->cursorItem) throw Script::Error("the cursor holds an item");
+    const uint32_t itemGuid = ArgItemGuid(L, 1), scrollGuid = ArgItemGuid(L, 2);
+    Unit* item = FindUnit(UnitType::Item, itemGuid);
+    Unit* scroll = FindUnit(UnitType::Item, scrollGuid);
+    if (!item || !scroll || item == scroll) throw Script::Error("item or scroll not found");
+    const ItemData* data = static_cast<const ItemData*>(item->data);
+    if (!data || (data->flags & 0x10)) throw Script::Error("the item is already identified");
+    uint8_t packet[9] = { 0x27 };
+    *reinterpret_cast<uint32_t*>(packet + 1) = itemGuid;
+    *reinterpret_cast<uint32_t*>(packet + 5) = scrollGuid;
+    SendPacket(packet, sizeof(packet));
+    return 0;
+}
+
+// Body locations: 1 head, 2 amulet, 3 body, 4 right hand, 5 left hand,
+// 6 right ring, 7 left ring, 8 belt, 9 boots, 10 gloves.
+int ArgBodySlot(lua_State* L, int index) {
+    const int slot = Script::ArgInt(L, index);
+    if (slot < 1 || slot > 10) throw Script::Error("body location must be 1 to 10");
+    return slot;
+}
+
+// act.equip_action(item, slot [, ignore_requirements]) -> number: what
+// putting `item` into the body slot would do, by the client's own check: 0
+// when it does not go there or she cannot wear it yet, 1 into the empty
+// slot, 5 swapping with what is worn, 2 or 7 a two-handed weapon taking the
+// place of one or two held items. The item may be anywhere the client knows
+// it (pack, ground, a shop). Reads only.
+int ActEquipAction(lua_State* L) {
+    Unit* player = RequirePlayer();
+    Unit* item = FindUnit(UnitType::Item, ArgItemGuid(L, 1));
+    if (!item) throw Script::Error("item not found");
+    const int slot = ArgBodySlot(L, 2);
+    lua_pushinteger(L, EquipActionForBodySlot(player, (uint32_t)slot, item, Script::OptBool(L, 3, false) ? 1 : 0));
+    return 1;
+}
+
+// act.equip(slot) -> bool, action: put the cursor item into a body slot, as a
+// click on that slot of the inventory screen does (the screen's own handler
+// is called: it sends the request and clears the cursor). An item worn there
+// comes back on the cursor. False with the action when the click would do
+// anything but wear the item (0: it does not fit or she cannot wear it), or
+// when the client's click throttle refused it: ask again on a later tick.
+int ActEquip(lua_State* L) {
+    Unit* player = RequirePlayer();
+    Unit* held = player->inventory ? player->inventory->cursorItem : nullptr;
+    if (!held) throw Script::Error("the cursor holds no item");
+    const int slot = ArgBodySlot(L, 1);
+    if (*CursorMode == 6 || *CursorMode == 8) throw Script::Error("the cursor is not carrying an item to wear");
+    const int32_t action = EquipActionForBodySlot(player, (uint32_t)slot, held, 0);
+    const bool hand = slot == 4 || slot == 5;
+    const bool wears = action == 1 || action == 5 || (hand && (action == 2 || action == 7));
+    const bool sent = wears && BodySlotClick[slot](player, player->inventory, (uint32_t)slot) != 0;
+    lua_pushboolean(L, sent);
+    lua_pushinteger(L, action);
+    return 2;
+}
+
 // act.transfer_gold('deposit' | 'withdraw', amount): move gold between the
 // inventory and the open stash, as the stash's gold dialogs do (button 0x14
 // deposits the inventory's gold, 0x13 withdraws the stash's). Gold in the stash
@@ -373,6 +463,16 @@ int ActLeaveGame(lua_State* L) {
     return 1;
 }
 
+// act.quest_log(open): use the native quest-panel command independently of key bindings.
+int ActQuestLog(lua_State* L) {
+    const bool open = Script::ArgBool(L, 1);
+    RequirePlayer();
+    const int panel = 15; // UI_QUESTSCREEN; opening requests the full quest record.
+    if (UIOpen(panel) != open) ToggleQuestLog();
+    lua_pushboolean(L, UIOpen(panel) == open);
+    return 1;
+}
+
 // act.key(vk): press a key in the game window (UI fallback).
 int ActKey(lua_State* L) {
     const int key = Script::ArgInt(L, 1);
@@ -396,6 +496,7 @@ int ActReady(lua_State* L) {
 const bool registered = (Script::RegisterModule(Script::InGame, [](lua_State* L) {
     static const luaL_Reg functions[] = {
         { "move", Script::Bind<ActMove> },
+        { "players", Script::Bind<ActPlayers> },
         { "move_to", Script::Bind<ActMoveTo> },
         { "select_skill", Script::Bind<ActSelectSkill> },
         { "cast", Script::Bind<ActCast> },
@@ -411,10 +512,14 @@ const bool registered = (Script::RegisterModule(Script::InGame, [](lua_State* L)
         { "to_belt", Script::Bind<ActToBelt> },
         { "pick_item", Script::Bind<ActPickItem> },
         { "place_item", Script::Bind<ActPlaceItem> },
+        { "identify", Script::Bind<ActIdentify> },
+        { "equip_action", Script::Bind<ActEquipAction> },
+        { "equip", Script::Bind<ActEquip> },
         { "transfer_gold", Script::Bind<ActTransferGold> },
         { "send", Script::Bind<ActSend> },
         { "leave_game", Script::Bind<ActLeaveGame> },
         { "key", Script::Bind<ActKey> },
+        { "quest_log", Script::Bind<ActQuestLog> },
         { "ready", Script::Bind<ActReady> },
         { nullptr, nullptr },
     };

@@ -1,7 +1,7 @@
 -- Keeps items and gold in the stash during a town visit, one step per tick.
 --
 --   local stash = require('lib.stash').new(function(item) return is_rune(item) end, 2000)
---   if stash:wanted(me) then local status = stash:tick(me) end  -- 'busy' or 'done'
+--   if stash:wanted(me) then local status = stash:tick(me) end  -- 'busy', 'done', 'failed'
 --
 -- Gold: a death drops the gold carried, but not the stash's, and vendors take
 -- stash gold. Carried gold above `float` is deposited.
@@ -20,6 +20,7 @@ stash.__index = stash
 local OPEN_STASH = 32    -- Objects.txt OperateFn
 local STEP_MS = 400
 local TIMEOUT_MS = 40000
+local RECOVERY_MS = 10000 -- stop with an error if our cursor item cannot be placed
 local REACH = 4
 
 local GOLD_SLACK = 200   -- do not walk to the stash for less than this
@@ -35,7 +36,7 @@ end
 
 -- Whether a stash visit has anything to do.
 function stash:wanted(me)
-  return self:pending() ~= nil or self:gold_move(me) ~= nil
+  return self.held ~= nil or self:pending() ~= nil or self:gold_move(me) ~= nil
 end
 
 -- Inventory items to store (page 0 only), largest first so they find room.
@@ -88,10 +89,50 @@ local function stash_spawn()
   end
 end
 
+-- Settle only our own lift before honoring either timeout. Inventory snapshots
+-- include the cursor item, so another cursor operation is never placed by us.
+function stash:settle(me, cancel)
+  local held = self.held
+  if not held then return nil end
+  local now = charon.now()
+  local item
+  for _, candidate in ipairs(game.items()) do
+    if candidate.id == held.id then item = candidate; break end
+  end
+  if item and item.location == 'container' and (item.page == 0 or item.page == 4)
+    and (self.tries > 0 or now - self.picked_at > 1500) then
+    self.held = nil
+    return nil
+  end
+  if now - self.picked_at > RECOVERY_MS then
+    self.failed = true
+    print('stash: cursor recovery failed for ' .. tostring(held.id))
+    return 'failed'
+  end
+  if not item or item.location ~= 'cursor' then return 'busy' end
+  if now - self.last < STEP_MS then return 'busy' end
+  self.last = now
+  local x, y = free_cell(held.width or 1, held.height or 1)
+  self.tries = self.tries + 1
+  if not cancel and game.ui('stash') and x and self.tries <= 2 then
+    print('stash: placing ' .. tostring(held.id) .. ' in stash')
+    act.place_item(held, 'stash', x, y)
+  else
+    self.full[held.id] = true
+    print('stash: returning ' .. tostring(held.id) .. ' to inventory')
+    act.place_item(held, 'inventory', held.grid_x or 0, held.grid_y or 0)
+  end
+  return 'busy'
+end
+
 function stash:tick(me)
+  if self.failed then return 'failed' end
   self.started = self.started or charon.now()
   local now = charon.now()
-  if now - self.started > TIMEOUT_MS then
+  local timed_out = now - self.started > TIMEOUT_MS
+  local settling = self:settle(me, timed_out)
+  if settling then return settling end
+  if timed_out then
     print('stash: timed out')
     return self:finish()
   end
@@ -127,31 +168,17 @@ function stash:tick(me)
     print(string.format('stash: %s %d gold', way, amount))
     return 'busy'
   end
-  if me.cursor_item then
-    local held = self.held
-    if not held then return 'busy' end -- wait for the cursor to report what it holds
-    local x, y = free_cell(held.width or 1, held.height or 1)
-    self.tries = (self.tries or 0) + 1
-    if x and self.tries <= 2 then
-      act.place_item(held, 'stash', x, y)
-      print(string.format('stash: %s -> stash (%d, %d)', tostring(held.name), x, y))
-    else
-      -- No room (or refused): back where it came from, and leave it be.
-      self.full[held.id] = true
-      act.place_item(held, 'inventory', held.grid_x or 0, held.grid_y or 0)
-      print('stash: no room for ' .. tostring(held.name))
-    end
-    return 'busy'
-  end
+  if me.cursor_item then return 'busy' end -- unrelated cursor item
   local item = (self:pending() or {})[1]
   if not item then return self:finish() end
-  self.held, self.tries = item, 0
+  self.held, self.tries, self.picked_at = item, 0, now
   act.pick_item(item)
   return 'busy'
 end
 
 function stash:finish()
-  if game.ui('stash') then act.key(27) end
+  if self.held then return self:settle(game.me(), true) or self:finish() end
+  if game.ui('stash') and not game.me().cursor_item then act.key(27) end
   self.started, self.held = nil, nil
   self.mover:stop()
   return 'done'

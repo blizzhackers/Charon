@@ -49,6 +49,25 @@ bool CurvedScreen() {
     return Settings["openGLFilter"] % static_cast<unsigned>(Filter::Count) == static_cast<unsigned>(Filter::CrtCurved);
 }
 
+// The game's vertical sync option holds every present for the display. With a
+// "Target Single Player FPS" above the display's refresh rate it would be the
+// limit in place of the setting (60 frames a second measured against a target
+// of 175), so there it gives way and the wait in GameLoop.cpp paces the frames
+// alone. Multiplayer keeps the game's own 25, where the option always holds.
+bool Vsync() {
+    if (!gameOptions || !gameOptions->vsync) return false;
+    const int type = D2::eD2GSGameType_007a0610; // 0 single player, 1 the same uncapped (0x44efb7)
+    if (type != 0 && type != 1) return true;
+    static DWORD hz = 0; static unsigned calls = 0;
+    if (calls++ % 256 == 0 && gameWindow) { // the window may have moved to another display
+        MONITORINFOEXA monitor{}; monitor.cbSize = sizeof(monitor);
+        DEVMODEA mode{}; mode.dmSize = sizeof(mode);
+        hz = GetMonitorInfoA(MonitorFromWindow(gameWindow, MONITOR_DEFAULTTONEAREST), &monitor)
+            && EnumDisplaySettingsA(monitor.szDevice, ENUM_CURRENT_SETTINGS, &mode) ? mode.dmDisplayFrequency : 0;
+    }
+    return hz <= 1 || Settings["TargetFPS"] <= hz; // 0 and 1 mean the rate is not known
+}
+
 using TileEviction = void (__fastcall*)(void*);
 // This leaf installs an eviction callback despite its database name.
 REMOTEFUNC(void __fastcall, SPRITECACHE_SetMaxSize, (TileEviction callback), 0x5fe000);
@@ -107,7 +126,7 @@ BOOL __fastcall CreateGameWindow(HWND window,int mode) {
     applyWindowMode = true;
     InitializeTileCacheThread();
     ghGlideWindow = 1; gnRenderState = 0;
-    if (gameOptions) Device::SetVsync(gameOptions->vsync != 0);
+    Device::SetVsync(Vsync());
     return TRUE;
 }
 BOOL __fastcall ResizeWindow(HWND window,int mode) {
@@ -159,7 +178,7 @@ BOOL __fastcall FinishScene() {
 BOOL __fastcall PresentScene() {
     if (!readyToPresent) return FALSE;
     readyToPresent = false;
-    if (gameOptions) Device::SetVsync(gameOptions->vsync != 0);
+    Device::SetVsync(Vsync());
     return Device::Present();
 }
 BOOL __fastcall GetBackBuffer(std::uint8_t* rgb) {
@@ -209,7 +228,7 @@ void __fastcall DebugFillBackBuffer(int,int) {} // Original slot 52 is a RET-onl
 bool FinishVideoFrame() {
     ApplyWindowMode();
     const Filter filter = static_cast<Filter>(Settings["openGLFilter"] % static_cast<unsigned>(Filter::Count));
-    if (gameOptions) Device::SetVsync(gameOptions->vsync != 0);
+    Device::SetVsync(Vsync());
     return Device::Finish(filter,gammaValue) && Device::Present();
 }
 

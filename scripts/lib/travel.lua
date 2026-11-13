@@ -19,6 +19,9 @@ travel.__index = travel
 local USE_RANGE = 4         -- interact with a warp from this close
 local USE_RETRY_MS = 1200
 local USE_ATTEMPTS = 6
+local CROSS_LEVEL_MS = 5000 -- let a moving border route finish a brief third-area detour
+local WARP_DETOUR_MS = 20000 -- a route to a stair may cut a corner of a neighbouring level
+local JUMP = 30             -- subtiles: farther than one tick walks, so a stair or portal moved us
 
 -- Breadth-first route of exits from level `from` to level `to`, or nil.
 function travel.route(from, to)
@@ -58,6 +61,11 @@ function travel:to(level)
   return self.status
 end
 
+-- Plans the leg in hand again from here: what it should keep off has changed.
+function travel:replan()
+  if self.status == 'moving' and self.mover.status == 'moving' then self.mover:plan(true) end
+end
+
 function travel:stop()
   self.status = 'idle'
   self.mover:stop()
@@ -91,20 +99,60 @@ local function warp_at(x, y)
   return best
 end
 
+-- A passage dodge must not aim at a waypoint left behind by combat. Query the
+-- current hop without changing the mover's deadlines, retries or issued action.
+function travel:dodge_heading(me)
+  local hop, mover = self.hop, self.mover
+  if self.status ~= 'moving' or not hop or hop.from ~= me.area or me.area == self.target
+    or mover.status ~= 'moving' or mover.door
+    or (hop.kind == 'warp' and move.distance(me.x, me.y, hop.x, hop.y) <= USE_RANGE + 2) then return end
+  local ok, path
+  if hop.kind == 'warp' then
+    ok, path = pcall(map.path, hop.x, hop.y, {step=mover.route_step or mover.step})
+  else
+    ok, path = pcall(map.path_to_level, hop.to, {step=mover.route_step or mover.step})
+  end
+  if not ok or not path then return end
+  for _, point in ipairs(path) do
+    if point.x ~= math.floor(me.x) or point.y ~= math.floor(me.y) then
+      if move.closed_door_ahead(me, point) then return end
+      return {x=point.x+0.5-me.x, y=point.y+0.5-me.y}
+    end
+  end
+end
+
 function travel:tick()
   if self.status ~= 'moving' then return self.status end
   local me = game.me()
+  local hop = self.hop
+  -- Walking over an open border is continuous; a stair or portal is a jump.
+  local last = self.last
+  local jumped = last and last.area ~= me.area and move.distance(me.x, me.y, last.x, last.y) > JUMP
+  self.last = { x = me.x, y = me.y, area = me.area }
+  if hop and (me.area == hop.from or me.area == hop.to) then hop.cross_since = nil end
   if me.area == self.target then
     self.status = 'arrived'
     self.mover:stop()
     return self.status
   end
-  if not self.hop or self.hop.from ~= me.area then
+  if hop and me.area ~= hop.from and me.area ~= hop.to then
+    -- The planned path left the hop's level for a neighbour (an open border
+    -- beside the route). Keep following it: planning again from each side sent
+    -- the player back and forth across the border indefinitely. A jump put us
+    -- somewhere the old path does not lead, so that plans again at once.
+    hop.cross_since = hop.cross_since or charon.now()
+    local allowed = hop.kind == 'warp' and WARP_DETOUR_MS or CROSS_LEVEL_MS
+    if not jumped and charon.now() - hop.cross_since < allowed
+      and self.mover.status == 'moving' and self.mover:tick() == 'moving' then return self.status end
+    -- A failed replan or expired detour releases ownership to the actual area.
+    self:begin_hop(me.area)
+    return self.status
+  end
+  if not hop or hop.from ~= me.area then
     -- New level, or a fight moved us: plan the next hop from here.
     self:begin_hop(me.area)
     return self.status
   end
-  local hop = self.hop
   if hop.kind ~= 'warp' then
     local status = self.mover:tick()
     if status == 'failed' or status == 'idle' then
@@ -123,7 +171,11 @@ function travel:tick()
   if d > USE_RANGE + 2 then
     local status = self.mover:tick()
     if status == 'arrived' or status == 'idle' then self.mover:to(hop.x, hop.y) end
-    if status == 'failed' then self.status, self.reason = 'failed', 'cannot reach the way to ' .. game.level_name(hop.to) end
+    if status == 'failed' then
+      self.status, self.reason = 'failed', 'cannot reach the way to ' .. game.level_name(hop.to)
+      print(string.format('travel: way to %s at (%d,%d) is %.1f away from (%.1f,%.1f): %s', game.level_name(hop.to),
+        hop.x, hop.y, d, me.x, me.y, tostring(self.mover.reason)))
+    end
     return self.status
   end
   local warp = warp_at(hop.x, hop.y)

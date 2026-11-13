@@ -81,6 +81,10 @@ REMOTEREF(BOOL, MessageLoopActive, 0x72DDD4);
 REMOTEREF(uint32_t, CharSelectionMode, 0x7795EC);
 REMOTEREF(CharSelEntry*, CharSelFirst, 0x779DBC);
 REMOTEREF(int, CharSelSelectedIndex, 0x70CC00);
+// Slot array and navigation offset confirmed in CHARSEL_HandleCharListClick
+// (0x43A9D0); see the existing OOG research. Entries include synthetic rows.
+REMOTEPTR(Control*, CharSelSlots, 0x779A20);
+REMOTEREF(int, CharSelNavigationIndex, 0x779DC8);
 
 REMOTEFUNC(BOOL __fastcall, D2WINEDITBOX_SetTextWide, (Control* pEdit, const wchar_t* wszText), 0x4FF5A0);
 REMOTEFUNC(void __stdcall, INPUT_FormKeyHandler, (ControlMsg* pMsg), 0x4F9B60);
@@ -257,6 +261,16 @@ void PushControl(lua_State* L, Control* c, int index) {
     int classId;
     const std::string role = Role(c, classId);
     if (!role.empty()) Script::SetField(L, "role", role);
+    if (role == "character_slot" && CharSelNavigationIndex >= 0 && CharSelNavigationIndex < 256) {
+        for (int slot = 0; slot < 8; ++slot) {
+            if (CharSelSlots[slot] != c) continue;
+            CharSelEntry* entry = CharSelFirst;
+            for (int i = 0; entry && i < CharSelNavigationIndex + slot; ++i) entry = entry->next;
+            if (entry && entry->entryType == 0)
+                Script::SetField(L, "character_name", std::string(entry->name, strnlen(entry->name, 16)));
+            break;
+        }
+    }
     if (classId >= 0) {
         Script::SetField(L, "class_id", classId);
         Script::SetField(L, "class", ClassNames[classId]);

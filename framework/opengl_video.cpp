@@ -107,6 +107,9 @@ struct Movie {
 void PlayMovie(const char* filename, int audio, void* frameCallback) {
     if (!filename) { Device::Fail("Null cutscene filename"); return; }
     if (videoPlaying || !Renderable()) return;
+    // With a script at the menus the logos and cinematics play to nobody:
+    // they were twenty-five seconds of every launch.
+    if (unattendedSession) return;
     Movie movie;
     videoPlaying = true; movie.started = true; cancelBink = false;
     binkSetSoundSystem(binkSoundSystem,0);

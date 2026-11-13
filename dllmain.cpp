@@ -12,6 +12,7 @@
 
 HINSTANCE hInst = nullptr;
 wchar_t saveDir[512] = { 0 };
+bool unattendedSession = false;
 
 namespace {
 bool initialized = false;

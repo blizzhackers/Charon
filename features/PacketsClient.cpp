@@ -2,6 +2,7 @@
 #include "headers/common.h"
 #include "headers/hook.h"
 #include "headers/remote.h"
+#include "headers/script_game.h"
 
 // SID (SERVER -> CLIENT)
 ASMPTR NET_SID_CLIENT_IncomingPacketHandler_Call = 0x51c7af;
@@ -98,6 +99,27 @@ ASMPTR NET_D2GS_CLIENT_PacketHandle_from0xAF_Call2 = 0x44bb4e;
 ASMPTR NET_D2GS_CLIENT_PacketHandle_from0xAF_Call3 = 0x44bd5a;
 REMOTEFUNC(void __fastcall, NET_D2GS_CLIENT_PacketHandle_from0xAF, (BYTE* pBytes, size_t nSize), 0x45c850);
 
+namespace {
+
+struct ClientPacketEntry {
+    void(__fastcall* handler)(BYTE*); // 00 per-packet callback, packet in ECX
+    uint32_t size;                   // 04 validated by the native dispatcher
+    void* unitHandler;               // 08 optional unit callback
+};
+static_assert(sizeof(ClientPacketEntry) == 12 && offsetof(ClientPacketEntry, handler) == 0
+    && offsetof(ClientPacketEntry, size) == 4 && offsetof(ClientPacketEntry, unitHandler) == 8,
+    "1.14d incoming client packet table layout");
+
+// 0x45D370 reads type@1, GUID@2, action@6, and 96 quest bytes@7; ECX input, plain RET.
+// Type 6 calls 0x4B6DD0, which applies the record to client buffer [0x7C0D43] before RET 8.
+void __fastcall QuestRecordPacket(BYTE* packet) {
+    const bool refreshed = packet[1] == 6;
+    reinterpret_cast<void(__fastcall*)(BYTE*)>(0x45D370)(packet);
+    if (refreshed) ++Game::QuestRecordRevision;
+}
+
+}
+
 void __fastcall NET_D2GS_CLIENT_PacketHandler_Replacement(BYTE* pBytes, size_t nSize)
 {
     // The native low-opcode dispatcher treats -1 as a no-op, without reading pBytes.
@@ -178,6 +200,9 @@ namespace Template {
                 MemoryPatch(NET_D2GS_CLIENT_PacketHandle_from0xAF_Call1) << CALL(NET_D2GS_CLIENT_PacketHandler_Replacement);
                 MemoryPatch(NET_D2GS_CLIENT_PacketHandle_from0xAF_Call2) << CALL(NET_D2GS_CLIENT_PacketHandler_Replacement);
                 MemoryPatch(NET_D2GS_CLIENT_PacketHandle_from0xAF_Call3) << CALL(NET_D2GS_CLIENT_PacketHandler_Replacement);
+                // 0x7116B0 is table[0x28].handler; preserve native 0x67-byte validation and batch dispatch.
+                auto* incoming = reinterpret_cast<ClientPacketEntry*>(0x7114D0);
+                MemoryPatch(reinterpret_cast<DWORD>(&incoming[0x28].handler)) << DATA(&QuestRecordPacket);
 
             // CLIENT -> SERVER
                 // SID

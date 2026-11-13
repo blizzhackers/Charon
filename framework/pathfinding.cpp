@@ -19,6 +19,16 @@ int Octile(Point a, Point b) {
     return StraightCost * (dx + dy) + (DiagonalCost - 2 * StraightCost) * std::min(dx, dy);
 }
 
+bool GroundCellOverlap(int size, int dx, int dy) {
+    dx = std::abs(dx);
+    dy = std::abs(dy);
+    // AddCollision_Width (0x64EA00): point, cross, or 3x3, expanded
+    // by the player's cross (GetUnitSizeX 0x620510).
+    if (size == 1) return dx + dy <= 1;
+    if (size == 2) return dx + dy <= 2;
+    return size == 3 && std::max(dx, dy) <= 2 && dx + dy <= 3;
+}
+
 }
 
 void Grid::Reset(int x, int y, int w, int h) {
@@ -60,7 +70,23 @@ void Grid::Inflate(int radius) {
     }
 }
 
+namespace {
+std::vector<Point> Search(const Grid& grid, const Grid* padded, int marginCost, Point start, const GoalTest& isGoal,
+    Point goalHint, size_t maxExpansions);
+}
+
 std::vector<Point> FindPath(const Grid& grid, Point start, const GoalTest& isGoal, Point goalHint, size_t maxExpansions) {
+    return Search(grid, nullptr, 1, start, isGoal, goalHint, maxExpansions);
+}
+
+std::vector<Point> FindPathSqueezing(const Grid& exact, const Grid& padded, Point start, const GoalTest& isGoal,
+    Point goalHint, int marginCost, size_t maxExpansions) {
+    return Search(exact, &padded, std::max(1, marginCost), start, isGoal, goalHint, maxExpansions);
+}
+
+namespace {
+std::vector<Point> Search(const Grid& grid, const Grid* padded, int marginCost, Point start, const GoalTest& isGoal,
+    Point goalHint, size_t maxExpansions) {
     if (!grid.Passable(start.x, start.y)) return {};
     const size_t cells = grid.blocked.size();
     std::vector<int32_t> cost(cells, INT32_MAX);
@@ -94,7 +120,8 @@ std::vector<Point> FindPath(const Grid& grid, Point start, const GoalTest& isGoa
             if (d >= 4 && (!grid.Passable(nx, p.y) || !grid.Passable(p.x, ny))) continue;
             const int32_t next = (int32_t)grid.Index(nx, ny);
             if (closed[next]) continue;
-            const int32_t nextCost = cost[current] + (d >= 4 ? DiagonalCost : StraightCost);
+            const int32_t step = d >= 4 ? DiagonalCost : StraightCost;
+            const int32_t nextCost = cost[current] + (padded && !padded->Passable(nx, ny) ? step * marginCost : step);
             if (nextCost >= cost[next]) continue;
             cost[next] = nextCost;
             parent[next] = current;
@@ -102,6 +129,7 @@ std::vector<Point> FindPath(const Grid& grid, Point start, const GoalTest& isGoa
         }
     }
     return {};
+}
 }
 
 std::vector<Point> FindPath(const Grid& grid, Point start, Point goal, size_t maxExpansions) {
@@ -154,6 +182,52 @@ std::vector<Point> Simplify(const Grid& grid, const std::vector<Point>& path, in
     return waypoints;
 }
 
+std::vector<Point> SimplifySqueezing(const Grid& exact, const Grid& padded, const std::vector<Point>& path,
+    int maxStep, int squeezeStep) {
+    if (path.size() <= 2) return path;
+    std::vector<Point> waypoints = { path.front() };
+    size_t anchor = 0;
+    while (anchor + 1 < path.size()) {
+        const Point a = path[anchor];
+        size_t best = anchor + 1;
+        for (size_t candidate = anchor + 2; candidate < path.size(); ++candidate) {
+            const Point b = path[candidate];
+            if (std::hypot(double(b.x - a.x), double(b.y - a.y)) > maxStep) break;
+            if (LineClear(padded, a, b)) best = candidate;
+        }
+        if (best == anchor + 1) {
+            // In or beside the margin: follow the planned cells a short way at a time.
+            for (size_t candidate = anchor + 2; candidate < path.size() && candidate - anchor <= size_t(squeezeStep); ++candidate) {
+                if (!LineClear(exact, a, path[candidate])) break;
+                best = candidate;
+            }
+        }
+        waypoints.push_back(path[best]);
+        anchor = best;
+    }
+    return waypoints;
+}
+
+size_t BlockZones(Grid& grid, const std::vector<Zone>& zones, Point start, const Point* goal) {
+    size_t marked = 0;
+    auto inside = [](const Zone& zone, Point p) {
+        const double dx = p.x + 0.5 - zone.x, dy = p.y + 0.5 - zone.y;
+        return dx * dx + dy * dy <= zone.radius * zone.radius;
+    };
+    for (const Zone& zone : zones) {
+        if (zone.radius <= 0 || inside(zone, start) || (goal && inside(zone, *goal))) continue;
+        const int reach = (int)std::ceil(zone.radius);
+        const int cx = (int)std::floor(zone.x), cy = (int)std::floor(zone.y);
+        for (int y = cy - reach; y <= cy + reach; ++y) {
+            for (int x = cx - reach; x <= cx + reach; ++x) {
+                if (grid.Contains(x, y) && inside(zone, { x, y })) grid.blocked[grid.Index(x, y)] = 1;
+            }
+        }
+        ++marked;
+    }
+    return marked;
+}
+
 bool NearestPassable(const Grid& grid, Point near, int maxRadius, Point& found) {
     for (int radius = 0; radius <= maxRadius; ++radius) {
         bool hit = false;
@@ -175,6 +249,24 @@ bool NearestPassable(const Grid& grid, Point near, int maxRadius, Point& found) 
     return false;
 }
 
+bool MovementStart(const Grid& grid, Point actual, Point& start) {
+    if (!grid.Passable(actual.x, actual.y)) return false;
+    start = actual;
+    return true;
+}
+
+bool OpenMovementStart(Grid& grid, Point actual) {
+    if (!grid.Contains(actual.x, actual.y) || !grid.LevelAt(actual.x, actual.y)) return false;
+    if (grid.Passable(actual.x, actual.y)) return true;
+    for (int d = 0; d < 4; ++d) {
+        if (grid.Passable(actual.x + Directions[d][0], actual.y + Directions[d][1])) {
+            grid.blocked[grid.Index(actual.x, actual.y)] = 0;
+            return true;
+        }
+    }
+    return false;
+}
+
 double Danger(const std::vector<Threat>& threats, double x, double y, double reach) {
     double danger = 0;
     for (const Threat& t : threats) {
@@ -182,6 +274,56 @@ double Danger(const std::vector<Threat>& threats, double x, double y, double rea
         if (d < reach) danger += t.weight * (1 - std::max(0.0, d - 1) / std::max(1.0, reach - 1));
     }
     return danger;
+}
+
+double MissileDanger(const std::vector<Missile>& missiles, double x, double y) {
+    double danger = 0;
+    for (const Missile& m : missiles) {
+        const double dx = m.toX - m.x, dy = m.toY - m.y;
+        const double length2 = dx * dx + dy * dy;
+        if (length2 < 0.01) continue; // stationary effects have no observed flight
+        const double projection = ((x - m.x) * dx + (y - m.y) * dy) / length2;
+        if (projection < 0) continue; // the missile has already passed this point
+        const double along = std::min(projection, 1.0);
+        const double distance = std::hypot(x - (m.x + along * dx), y - (m.y + along * dy));
+        // A short sidestep clears the lane; running directly away does not.
+        danger += 2 * std::max(0.0, 1 - distance / 1.5);
+    }
+    return danger;
+}
+
+double GroundDanger(const std::vector<GroundHazard>& hazards, double x, double y) {
+    double danger = 0;
+    const int px = (int)std::floor(x), py = (int)std::floor(y);
+    for (const GroundHazard& hazard : hazards) {
+        const int hx = (int)std::floor(hazard.x), hy = (int)std::floor(hazard.y);
+        if (GroundCellOverlap(hazard.size, hx - px, hy - py)) danger += 100;
+    }
+    return danger;
+}
+
+bool GroundHazardClear(const std::vector<GroundHazard>& hazards, double x1, double y1, double x2, double y2) {
+    if (x1 == x2 && y1 == y2) return GroundDanger(hazards, x1, y1) == 0;
+    for (const GroundHazard& hazard : hazards) {
+        const int hx = (int)std::floor(hazard.x), hy = (int)std::floor(hazard.y);
+        for (int dy = -2; dy <= 2; ++dy) {
+            for (int dx = -2; dx <= 2; ++dx) {
+                if (!GroundCellOverlap(hazard.size, dx, dy)) continue;
+                // Clip the segment against each expanded cell. Closed edges
+                // include corner-touching cells, with work bounded by hazards.
+                double begin = 0, end = 1;
+                auto clip = [&](double from, double delta, int cell) {
+                    if (delta == 0) return from >= cell && from <= cell + 1;
+                    const double a = (cell - from) / delta, b = (cell + 1 - from) / delta;
+                    begin = std::max(begin, std::min(a, b));
+                    end = std::min(end, std::max(a, b));
+                    return begin <= end;
+                };
+                if (clip(x1, x2-x1, hx+dx) && clip(y1, y2-y1, hy+dy)) return false;
+            }
+        }
+    }
+    return true;
 }
 
 SafeSpot FindSafeSpot(const Grid& grid, Point player, const std::vector<Threat>& threats, const SafeSpotOptions& options) {
@@ -193,6 +335,11 @@ SafeSpot FindSafeSpot(const Grid& grid, Point player, const std::vector<Threat>&
     auto inside = [&](int x, int y) { return x >= originX && y >= originY && x < originX + side && y < originY + side; };
     auto index = [&](int x, int y) { return size_t(y - originY) * side + size_t(x - originX); };
     const double px = player.x + 0.5, py = player.y + 0.5;
+    const double headingScale = std::max(std::abs(options.headingX), std::abs(options.headingY));
+    const double headingLength = headingScale > 0 && std::isfinite(headingScale)
+        ? std::hypot(options.headingX / headingScale, options.headingY / headingScale) : 0;
+    const double headingX = headingLength > 0 ? (options.headingX / headingScale) / headingLength : 0;
+    const double headingY = headingLength > 0 ? (options.headingY / headingScale) / headingLength : 0;
 
     // Threats where they are and where they will be shortly (moving toward us).
     std::vector<Threat> predicted = threats;
@@ -208,12 +355,14 @@ SafeSpot FindSafeSpot(const Grid& grid, Point player, const std::vector<Threat>&
     }
 
     // Per-cell danger (from predicted positions) and usability.
-    std::vector<double> danger(cells, 0);
+    std::vector<double> danger(cells, 0), ground(cells, 0);
     std::vector<uint8_t> usable(cells, 0);
     for (int y = originY; y < originY + side; ++y) {
         for (int x = originX; x < originX + side; ++x) {
             const size_t i = index(x, y);
-            danger[i] = Danger(predicted, x + 0.5, y + 0.5, options.reach);
+            ground[i] = GroundDanger(options.hazards, x + 0.5, y + 0.5);
+            danger[i] = Danger(predicted, x + 0.5, y + 0.5, options.reach)
+                + MissileDanger(options.missiles, x + 0.5, y + 0.5) + ground[i];
             bool occupied = false;
             for (size_t t = 0; t < threats.size() && !occupied; ++t) {
                 occupied = std::hypot(threats[t].x - (x + 0.5), threats[t].y - (y + 0.5)) < options.occupied
@@ -222,7 +371,9 @@ SafeSpot FindSafeSpot(const Grid& grid, Point player, const std::vector<Threat>&
             usable[i] = grid.Passable(x, y) && !occupied && !(options.liveBlocked && options.liveBlocked(x, y)) ? 1 : 0;
         }
     }
-    result.dangerHere = Danger(predicted, px, py, options.reach);
+    result.missileHere = MissileDanger(options.missiles, px, py);
+    result.hazardHere = GroundDanger(options.hazards, px, py);
+    result.dangerHere = Danger(predicted, px, py, options.reach) + result.missileHere + result.hazardHere;
     // The player's own cell is always a start, even when crowded.
     const size_t start = index(player.x, player.y);
     usable[start] = 1;
@@ -276,6 +427,10 @@ SafeSpot FindSafeSpot(const Grid& grid, Point player, const std::vector<Threat>&
             if (!inside(nx, ny) || !usable[index(nx, ny)]) continue;
             if (d >= 4 && (!usable[index(nx, cy)] || !usable[index(cx, ny)])) continue;
             const size_t next = index(nx, ny);
+            // Escape an existing overlap, but never enter fire once clear.
+            // A diagonal also sweeps its two orthogonal side cells.
+            if (ground[current] == 0 && (ground[next] > 0 || (d >= 4
+                && (ground[index(nx, cy)] > 0 || ground[index(cx, ny)] > 0)))) continue;
             if (clearance[next] < wanted && length[current] >= 2) continue;
             const double distance = d >= 4 ? 1.414 : 1.0;
             const double step = distance * (1 + 6 * danger[next]);
@@ -293,17 +448,19 @@ SafeSpot FindSafeSpot(const Grid& grid, Point player, const std::vector<Threat>&
         if (!options.hasTarget) return 0.0;
         const double d = std::hypot(options.targetX - (x + 0.5), options.targetY - (y + 0.5));
         double penalty = 0;
-        if (d > options.range) penalty += (d - options.range) * 0.15;
+        if (d > options.range) penalty += (d - options.range) * options.rangeWeight;
         const Point target = { (int)std::floor(options.targetX), (int)std::floor(options.targetY) };
         if (!LineClear(grid, { x, y }, target)) penalty += 0.25;
         return penalty;
     };
     const double pi = 3.14159265358979;
-    double bestScore = -(result.dangerHere + targetPenalty(player.x, player.y));
+    const double stayScore = -(result.dangerHere + targetPenalty(player.x, player.y));
+    double bestScore = result.hazardHere > 0 ? -1e30 : stayScore;
+    double bestForward = 0;
     int32_t best = -1;
     bool sectorOpen[8] = { false };
     for (size_t i = 0; i < cells; ++i) {
-        if (cost[i] >= 1e30 || !usable[i] || clearance[i] < wanted) continue;
+        if (cost[i] >= 1e30 || !usable[i] || clearance[i] < wanted || ground[i] > 0) continue;
         const int x = originX + int(i % side), y = originY + int(i / side);
         // An open sector: a roomy cell at least 6 away that is clearly safer than here.
         const double away = std::hypot(double(x - player.x), double(y - player.y));
@@ -311,9 +468,14 @@ SafeSpot FindSafeSpot(const Grid& grid, Point player, const std::vector<Threat>&
             const double angle = std::atan2(double(y - player.y), double(x - player.x));
             sectorOpen[int(std::floor((angle + pi) / (2 * pi) * 8)) & 7] = true;
         }
-        const double score = -(danger[i] + options.travelWeight * length[i] + targetPenalty(x, y));
-        if (score > bestScore + 1e-9) {
-            bestScore = score;
+        const double forward = (x - player.x) * headingX + (y - player.y) * headingY;
+        const double score = -(danger[i] + options.travelWeight * length[i] + targetPenalty(x, y))
+            + options.headingWeight * forward;
+        const bool better = score > bestScore + 1e-9;
+        if (better || (best >= 0 && score > stayScore + 1e-9
+            && std::abs(score - bestScore) <= 1e-9 && forward > bestForward + 1e-9)) {
+            if (better) bestScore = score; // heading ties never lower the primary score anchor
+            bestForward = forward;
             best = (int32_t)i;
         }
     }
@@ -322,8 +484,192 @@ SafeSpot FindSafeSpot(const Grid& grid, Point player, const std::vector<Threat>&
     result.found = true;
     result.spot = { originX + best % side, originY + best / side };
     result.dangerThere = danger[best];
+    result.missileThere = MissileDanger(options.missiles, result.spot.x + 0.5, result.spot.y + 0.5);
+    result.hazardThere = ground[best];
     for (int32_t i = best; i >= 0; i = parent[i]) result.path.push_back({ originX + i % side, originY + i / side });
     std::reverse(result.path.begin(), result.path.end());
+    return result;
+}
+
+bool FindNearest(const Grid& grid, Point start, uint16_t level, const GoalTest& isGoal, Point& result, int& distance) {
+    if (!grid.Passable(start.x, start.y)) return false;
+
+    std::vector<int32_t> steps(grid.blocked.size(), -1);
+    std::vector<int32_t> queue;
+    queue.reserve(4096);
+    const size_t first = grid.Index(start.x, start.y);
+    steps[first] = 0;
+    queue.push_back((int32_t)first);
+    static const int directions[8][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 } };
+    for (size_t head = 0; head < queue.size(); ++head) {
+        const int32_t current = queue[head];
+        const int x = grid.originX + current % grid.width, y = grid.originY + current / grid.width;
+        if (isGoal(x, y)) { result = { x, y }; distance = steps[current]; return true; }
+        for (const auto& d : directions) {
+            const int nx = x + d[0], ny = y + d[1];
+            if (!grid.Passable(nx, ny) || grid.LevelAt(nx, ny) != level) continue;
+            if (d[0] && d[1] && (!grid.Passable(nx, y) || !grid.Passable(x, ny))) continue;
+            const size_t next = grid.Index(nx, ny);
+            if (steps[next] >= 0) continue;
+            steps[next] = steps[current] + 1;
+            queue.push_back((int32_t)next);
+        }
+    }
+    return false;
+}
+
+// An unsearched region up to this many blocks counts as a pocket, in
+// proportion; a region that size or larger counts 1 + PocketWeight times as far.
+const double PocketBlocks = 64, PocketWeight = 4;
+
+ExploreChoice ChooseExploration(const Grid& grid, Point start, uint16_t level,
+    const std::vector<uint8_t>& seen, const ExploreOptions& options) {
+    ExploreChoice result;
+    if (options.cell < 4 || options.cell > 40 || options.minimum < 1 || options.minimum > 1600
+        || !std::isfinite(options.headingX) || !std::isfinite(options.headingY)
+        || std::abs(options.headingX) > 65535 || std::abs(options.headingY) > 65535
+        || options.targets.size() > 512 || options.exclude.size() > 64
+        || seen.size() != grid.blocked.size() || !grid.Passable(start.x, start.y)
+        || grid.LevelAt(start.x, start.y) != level) return result;
+    const int w = grid.width, h = grid.height, cell = options.cell;
+    const size_t cells = grid.blocked.size();
+    std::vector<uint8_t> walkable(cells);
+    std::vector<int32_t> steps(cells, -1), queue;
+    queue.reserve(cells);
+    for (size_t i = 0; i < cells; ++i) walkable[i] = !grid.blocked[i] && grid.level[i] == level;
+    const int32_t first = (int32_t)grid.Index(start.x, start.y);
+    steps[first] = 0;
+    queue.push_back(first);
+    for (size_t head = 0; head < queue.size(); ++head) {
+        const int32_t i = queue[head];
+        result.unseen += !seen[i];
+        const int x = i % w, y = i / w;
+        for (const auto& d : Directions) {
+            const int nx = x + d[0], ny = y + d[1];
+            if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+            const int32_t next = ny * w + nx;
+            if (!walkable[next] || steps[next] >= 0) continue;
+            if (d[0] && d[1] && (!walkable[y * w + nx] || !walkable[ny * w + x])) continue;
+            steps[next] = steps[i] + 1;
+            queue.push_back(next);
+        }
+    }
+    result.total = (int)queue.size();
+    for (const auto& target : options.targets) {
+        if (!grid.Contains(target.point.x, target.point.y)) continue;
+        const int distance = steps[grid.Index(target.point.x, target.point.y)];
+        if (distance < 0 || (result.found && (distance > result.steps
+            || (distance == result.steps && target.id >= result.id)))) continue;
+        result.found = result.monster = true;
+        result.id = target.id;
+        result.point = target.point;
+        result.steps = distance;
+    }
+    if (result.found) return result;
+
+    std::vector<uint8_t> visited(cells, 0);
+    const int columns = (w + cell - 1) / cell, rows = (h + cell - 1) / cell;
+    std::vector<uint8_t> excluded(size_t(columns) * rows, 0);
+    for (Point p : options.exclude) {
+        if (grid.Contains(p.x, p.y)) excluded[size_t((p.y - grid.originY) / cell) * columns + (p.x - grid.originX) / cell] = 1;
+    }
+    // How much unsearched ground hangs together with each unsearched cell
+    // (4-connected through unsearched cells, the whole level): a small figure
+    // is a pocket, a side room or the end of a passage.
+    std::vector<int32_t> region(cells, -1);
+    std::vector<int32_t> regionSize;
+    if (options.organized) {
+        std::vector<int32_t> fill;
+        for (int32_t seed : queue) {
+            if (seen[seed] || region[seed] >= 0) continue;
+            const int32_t id = (int32_t)regionSize.size();
+            fill.clear();
+            fill.push_back(seed);
+            region[seed] = id;
+            for (size_t head = 0; head < fill.size(); ++head) {
+                const int32_t i = fill[head];
+                const int x = i % w, y = i / w;
+                for (int d = 0; d < 4; ++d) {
+                    const int nx = x + Directions[d][0], ny = y + Directions[d][1];
+                    if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+                    const int32_t next = ny * w + nx;
+                    if (steps[next] < 0 || seen[next] || region[next] >= 0) continue;
+                    region[next] = id;
+                    fill.push_back(next);
+                }
+            }
+            regionSize.push_back((int32_t)fill.size());
+        }
+    }
+    // Local components keep two pockets on opposite sides of a wall separate,
+    // even when they connect by a long route outside this block.
+    std::vector<int32_t> component;
+    component.reserve(size_t(cell) * cell);
+    double bestScore = -1;
+    const double headingLength = std::hypot(options.headingX, options.headingY);
+    for (int32_t seed : queue) {
+        if (seen[seed] || visited[seed]) continue;
+        const int bx = seed % w / cell, by = seed / w / cell;
+        if (excluded[size_t(by) * columns + bx]) continue;
+        const int left = bx * cell, top = by * cell;
+        const int right = std::min(w, left + cell), bottom = std::min(h, top + cell);
+        component.clear();
+        component.push_back(seed);
+        visited[seed] = 1;
+        double sumX = 0, sumY = 0;
+        for (size_t head = 0; head < component.size(); ++head) {
+            const int32_t i = component[head];
+            const int x = i % w, y = i / w;
+            sumX += x;
+            sumY += y;
+            for (int d = 0; d < 4; ++d) {
+                const int nx = x + Directions[d][0], ny = y + Directions[d][1];
+                if (nx < left || nx >= right || ny < top || ny >= bottom) continue;
+                const int32_t next = ny * w + nx;
+                if (steps[next] < 0 || seen[next] || visited[next]) continue;
+                visited[next] = 1;
+                component.push_back(next);
+            }
+        }
+        const int gain = (int)component.size();
+        if (gain < options.minimum) continue;
+        const double cx = sumX / gain, cy = sumY / gain;
+        int32_t representative = seed;
+        double nearest = HUGE_VAL;
+        for (int32_t i : component) {
+            const double dx = i % w - cx, dy = i / w - cy, distance = dx * dx + dy * dy;
+            if (distance < nearest || (distance == nearest && (steps[i] < steps[representative]
+                || (steps[i] == steps[representative] && i < representative)))) {
+                nearest = distance;
+                representative = i;
+            }
+        }
+        const Point p = {grid.originX + representative % w, grid.originY + representative / w};
+        const double dx = double(p.x) - start.x, dy = double(p.y) - start.y, length = std::hypot(dx, dy);
+        const double alignment = headingLength > 0 && length > 0
+            ? (dx * options.headingX + dy * options.headingY) / (length * headingLength) : 0;
+        double score = gain / (steps[representative] + 12.0) * (1.0 + 0.05 * alignment);
+        if (options.organized) {
+            // Nearest first, and what is at hand before what is ahead: ground
+            // that belongs to a large unsearched region counts as up to five
+            // times as far, so a pocket beside the way is taken while it is
+            // close and not walked back to from the far end of the level.
+            // (Ranked by ground gained per step, the big patch ahead won and
+            // the side passage was left for later.) The two figures are the
+            // best of a dozen pairs on the three maps of tests/pathfinding.cpp.
+            const double pocket = PocketBlocks * cell * cell;
+            const double share = std::min(double(regionSize[region[seed]]), pocket) / pocket;
+            score = 1.0 / ((steps[representative] + 12.0) * (1.0 + PocketWeight * share)) * (1.0 + 0.05 * alignment);
+        }
+        if (score < bestScore || (score == bestScore && result.found
+            && (steps[representative] > result.steps || (steps[representative] == result.steps
+                && representative >= (int32_t)grid.Index(result.point.x, result.point.y))))) continue;
+        bestScore = score;
+        result.found = true;
+        result.point = p;
+        result.steps = steps[representative];
+        result.gain = gain;
+    }
     return result;
 }
 

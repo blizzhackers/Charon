@@ -5,7 +5,8 @@
  *   -luaffi             lets scripts require LuaJIT's FFI (unchecked memory access)
  * In game, `/lua reload` and `/lua stop` control the game script and `/lua mem`
  * reports the Lua heaps, the bindings' caches and Game.exe's private bytes.
- * Ticks run at the game's 25 Hz logic rate. Relative paths resolve from Game.exe's
+ * In a game, ticks follow the game's own frames (25 a second at the stock rate) and
+ * the script clock counts 40 ms for each, so scripts see game time at any frame rate. Relative paths resolve from Game.exe's
  * folder. Scripts reload when their files change.
  */
 #include "headers/feature.h"
@@ -29,9 +30,16 @@ bool allowFFI = false, gameActive = false, gameStopped = false;
 enum class ChatRequest { None, Reload, Stop } chatRequest = ChatRequest::None;
 std::unique_ptr<Script::ScriptHost> oogHost, gameHost;
 uint32_t oogFrame = 0, gameFrame = 0;
-double oogNextTick = 0, gameNextTick = 0;
-// Script ticks follow the game's 25 Hz logic rate; the raw loops spin far faster.
+double oogNextTick = 0, oogReloadCheck = 0, gameReloadCheck = 0;
+// One step of the game's logic is 40 ms of game time. Menus have no frames of
+// their own: there the same interval is measured on the wall clock.
 const double TickIntervalMs = 40.0;
+// A longer gap in the frame count is a new game or a reset counter, not time that passed.
+const uint32_t FrameGapLimit = 250;
+// The script clock: game time while a game runs, wall time otherwise.
+double scriptClockMs = 0, clockWallMs = 0;
+uint32_t clockFrame = 0;
+bool clockInGame = false;
 FILE* logFile = nullptr;
 LARGE_INTEGER clockStart, clockFrequency;
 const char* currentContext = "oog";
@@ -66,8 +74,7 @@ std::wstring ResolvePath(const std::wstring& path) {
 }
 
 void WriteLog(const std::string& line) {
-    const bool error = line.find("] error: ") != std::string::npos;
-    gamelog << COLOR(error ? 1 : 0) << Script::Widen(line) << std::endl;
+    // Script diagnostics stay in the file instead of flooding the game screen.
     if (!logFile) return;
     SYSTEMTIME time;
     GetLocalTime(&time);
@@ -140,6 +147,33 @@ std::unique_ptr<Script::ScriptHost> CreateHost(const char* name, const std::wstr
     return host;
 }
 
+bool InGame() {
+    return Game::Player() && Game::UnitLevelId(Game::Player()) && !Game::LeavingGame();
+}
+
+// Advances the script clock and returns how many game frames passed (0 out of
+// game). Scripts time everything with this clock, so a game that runs faster
+// or slower than 25 frames a second plays the same.
+uint32_t AdvanceClock() {
+    const double wall = NowMs();
+    const bool inGame = InGame();
+    uint32_t frames = 0;
+    if (inGame && clockInGame) {
+        const uint32_t frame = *Game::ClientFrame;
+        frames = frame - clockFrame;
+        if (frames > FrameGapLimit) frames = 1;
+        clockFrame = frame;
+        scriptClockMs += frames * TickIntervalMs;
+    }
+    else {
+        if (inGame) clockFrame = *Game::ClientFrame;
+        scriptClockMs += wall - clockWallMs;
+    }
+    clockInGame = inGame;
+    clockWallMs = wall;
+    return frames;
+}
+
 bool TickDue(double& next) {
     const double now = NowMs();
     if (now < next) return false;
@@ -148,9 +182,12 @@ bool TickDue(double& next) {
     return true;
 }
 
-// Reloads a changed script about twice a second.
-void ReloadIfChanged(Script::ScriptHost& host, uint32_t frame) {
-    if (frame % 12 == 0 && host.SourcesChanged()) {
+// Reloads a changed script, checking about twice a second of wall time.
+void ReloadIfChanged(Script::ScriptHost& host, double& nextCheck) {
+    const double now = NowMs();
+    if (now < nextCheck) return;
+    nextCheck = now + 480;
+    if (host.SourcesChanged()) {
         host.Log("source changed, reloading");
         host.Load();
     }
@@ -167,6 +204,11 @@ int CharonFrame(lua_State* L) {
 }
 
 int CharonNow(lua_State* L) {
+    lua_pushnumber(L, scriptClockMs);
+    return 1;
+}
+
+int CharonWall(lua_State* L) {
     lua_pushnumber(L, NowMs());
     return 1;
 }
@@ -201,7 +243,34 @@ void ReportMemory() {
     line += ", game " + (gameHost && gameHost->HeapBytes() ? Megabytes(gameHost->HeapBytes()) : std::string("-"));
     for (const auto& [name, bytes] : Script::MemoryUse()) line += "; " + name + " " + Megabytes(bytes);
     line += "; Game.exe private " + Megabytes(ProcessBytes());
+    gamelog << COLOR(0) << Script::Widen(line) << std::endl;
     WriteLog(line);
+}
+
+// charon.overlay(lines | nil): lines of text kept in the upper right corner
+// of the game screen while the automap is not shown; nil or an empty table
+// takes them away. They stay until replaced, across games: a script that
+// wants them gone says so. At most OverlayLines of OverlayChars characters.
+const size_t OverlayLines = 12, OverlayChars = 64;
+std::vector<std::wstring> overlay;
+int CharonOverlay(lua_State* L) {
+    std::vector<std::wstring> lines;
+    if (!lua_isnoneornil(L, 1)) {
+        if (lua_type(L, 1) != LUA_TTABLE) throw Script::Error("bad argument #1 (table or nil expected)");
+        const size_t count = lua_objlen(L, 1);
+        if (count > OverlayLines) throw Script::Error("too many overlay lines");
+        for (size_t i = 1; i <= count; ++i) {
+            lua_rawgeti(L, 1, (int)i);
+            const char* text = lua_type(L, -1) == LUA_TSTRING ? lua_tostring(L, -1) : nullptr;
+            std::string line = text ? text : "";
+            lua_pop(L, 1);
+            if (!text) throw Script::Error("overlay lines must be strings");
+            if (line.size() > OverlayChars) line.resize(OverlayChars);
+            lines.push_back(Script::Widen(line));
+        }
+    }
+    overlay.swap(lines);
+    return 0;
 }
 
 int CharonLog(lua_State* L) {
@@ -215,7 +284,9 @@ const bool registered = (Script::RegisterModule(Script::AnyContext, [](lua_State
         { "context", Script::Bind<CharonContext> },
         { "frame", Script::Bind<CharonFrame> },
         { "now", Script::Bind<CharonNow> },
+        { "wall", Script::Bind<CharonWall> },
         { "log", Script::Bind<CharonLog> },
+        { "overlay", Script::Bind<CharonOverlay> },
         { "memory", Script::Bind<CharonMemory> },
         { nullptr, nullptr },
     };
@@ -232,6 +303,7 @@ public:
     void init() {
         QueryPerformanceCounter(&clockStart);
         QueryPerformanceFrequency(&clockFrequency);
+        clockWallMs = NowMs();
 
         int argc = 0;
         LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
@@ -246,12 +318,30 @@ public:
         const std::wstring logPath = std::wstring(saveDir) + L"\\lua.log";
         logFile = _wfsopen(logPath.c_str(), L"a", _SH_DENYNO);
         AddVectoredExceptionHandler(1, CrashTracer);
+        unattendedSession = !oogPath.empty();
         if (!oogPath.empty()) oogHost = CreateHost("oog", oogPath, Script::OutOfGame);
         if (!gamePath.empty()) gameHost = CreateHost("game", gamePath, Script::InGame);
     }
 
+    // The script's overlay lines, right-aligned under the top edge, unless the
+    // automap is up (its own text is drawn there).
+    void gamePostDraw() {
+        const int AutomapFlag = 0x0A;
+        if (overlay.empty() || D2::GetUIFlag(AutomapFlag)) return;
+        const DWORD font = 13, previous = D2::SetAndReturnLastFont(font);
+        int top = 8;
+        for (const std::wstring& line : overlay) {
+            int width = 0, height = 0;
+            D2::TEXT_CalcTextDimensions(line.c_str(), &width, &height);
+            top += height - 6;
+            D2::DRAW_text(line.c_str(), D2::ScreenWidth - 12 - width, top, 0, 0);
+        }
+        D2::SetAndReturnLastFont(previous);
+    }
+
     void oogLoop() {
         if (inTick) return;
+        AdvanceClock();
         TickScope scope;
         currentContext = "oog";
         if (gameActive) {
@@ -261,15 +351,36 @@ public:
         }
         if (!oogHost || !TickDue(oogNextTick)) return;
         if (!oogFrame++) oogHost->Load();
-        else ReloadIfChanged(*oogHost, oogFrame);
-        oogHost->Tick(oogFrame, NowMs());
+        else ReloadIfChanged(*oogHost, oogReloadCheck);
+        oogHost->Tick(oogFrame, scriptClockMs);
     }
 
     void gameLoop() {
-        if (inTick || !gameHost || !TickDue(gameNextTick)) return;
-        // The message loop also runs while a game loads and shuts down: tick only
-        // once the player stands in a level, and stop once a leave is under way.
-        if (!Game::Player() || !Game::UnitLevelId(Game::Player()) || Game::LeavingGame()) return;
+        if (inTick) return;
+        // The message loop spins faster than the game steps, and also runs while
+        // a game loads and shuts down: tick once per game frame, only once the
+        // player stands in a level, and stop once a leave is under way.
+        const uint32_t frames = AdvanceClock();
+        if (!gameHost || !InGame()) return;
+        // The escape menu pauses single player: no frames, so no ticks, and a
+        // script cannot close a menu that a stray Escape of its own opened.
+        // One run sat in it for twelve minutes, twice. Left open this long
+        // under a running script, it is closed the way the key closes it.
+        static double escapeSince = 0;
+        const int EscapeMenuFlag = 9; // UI_ESCMENU, as act.leave_game checks it
+        if (gameActive && !gameStopped && Game::UIOpen(EscapeMenuFlag)) {
+            const double wall = NowMs();
+            if (!escapeSince) escapeSince = wall;
+            else if (wall - escapeSince >= 20000 && D2::hwndD2GFX_Window) {
+                gameHost->Log("escape menu open for 20 s under a running script; closing it");
+                const UINT scan = MapVirtualKeyW(VK_ESCAPE, MAPVK_VK_TO_VSC);
+                PostMessageW(D2::hwndD2GFX_Window, WM_KEYDOWN, VK_ESCAPE, 1 | (scan << 16));
+                PostMessageW(D2::hwndD2GFX_Window, WM_KEYUP, VK_ESCAPE, 1 | (scan << 16) | 0xC0000000);
+                escapeSince = 0;
+            }
+        }
+        else escapeSince = 0;
+        if (gameActive && !frames) return;
         TickScope scope;
         currentContext = "game";
         if (chatRequest == ChatRequest::Stop) {
@@ -288,8 +399,8 @@ public:
             gameFrame = 0;
             gameHost->Load();
         }
-        else if (!gameStopped) ReloadIfChanged(*gameHost, gameFrame);
-        gameHost->Tick(++gameFrame, NowMs());
+        else if (!gameStopped) ReloadIfChanged(*gameHost, gameReloadCheck);
+        gameHost->Tick(++gameFrame, scriptClockMs);
     }
 
     bool chatInput(InputStream msg) {

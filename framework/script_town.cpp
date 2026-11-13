@@ -10,6 +10,7 @@
 #include "headers/common.h"
 #include "headers/script_game.h"
 #include "headers/script_host.h"
+#include <cmath>
 
 namespace ScriptTown {
 
@@ -44,13 +45,17 @@ Unit* RequirePlayer() {
 }
 
 uint32_t ArgGuid(lua_State* L, int index) {
+    double id;
     if (lua_type(L, index) == LUA_TTABLE) {
         Script::RawField(L, index, "id");
-        const double id = lua_tonumber(L, -1);
+        id = Script::ArgNumber(L, -1);
         lua_pop(L, 1);
-        return (uint32_t)id;
+    } else {
+        id = Script::ArgNumber(L, index);
     }
-    return (uint32_t)Script::ArgNumber(L, index);
+    if (!std::isfinite(id) || id < 0 || id > 4294967295.0 || std::floor(id) != id)
+        throw Script::Error("unit id must be an unsigned 32-bit integer");
+    return (uint32_t)id;
 }
 
 Unit* ArgNpc(lua_State* L, int index) {
@@ -147,6 +152,25 @@ int TownPrice(lua_State* L) {
     if (!item) throw Script::Error("item not found");
     if (!QuestRecord()) throw Script::Error("quest record not received yet");
     lua_pushinteger(L, TransactionPrice(player, item, Difficulty(), QuestRecord(), npc->classId, modeId));
+    return 1;
+}
+
+// The same client price calculation, without requiring an NPC or inventory
+// ownership. 0x62FDC0 takes six stack arguments (RET 18); 0x62EFB0 reads item
+// stats/quality/quantity and client quest/NPC tables, independent of item mode.
+int TownSellValue(lua_State* L) {
+    Unit* player = RequirePlayer();
+    const uint32_t guid = ArgGuid(L, 1);
+    const int npcClass = Script::OptInt(L, 2, 148); // Akara
+    if (!Trades(npcClass)) throw Script::Error("unsupported vendor class");
+    Unit* item = FindUnit(UnitType::Item, guid);
+    if (!item) item = FindInInventory(player, guid);
+    if (!item || !item->data || !GetItemsTxt((uint32_t)item->classId) || !QuestRecord()) return 0;
+    if (!CanSellItem(item)) {
+        lua_pushinteger(L, 0);
+        return 1;
+    }
+    lua_pushinteger(L, TransactionPrice(player, item, Difficulty(), QuestRecord(), npcClass, 1));
     return 1;
 }
 
@@ -283,6 +307,7 @@ const bool registered = (Script::RegisterModule(Script::InGame, [](lua_State* L)
         { "close", Script::Bind<TownClose> },
         { "respec", Script::Bind<TownRespec> },
         { "price", Script::Bind<TownPrice> },
+        { "sell_value", Script::Bind<TownSellValue> },
         { "buy", Script::Bind<TownBuy> },
         { "sell", Script::Bind<TownSell> },
         { "repair_all", Script::Bind<TownRepairAll> },

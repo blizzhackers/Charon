@@ -1,6 +1,12 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include "headers/script_host.h"
+#include "headers/script_game.h"
+#include "headers/script_stat_requests.h"
+#include <climits>
+extern "C" {
+#include <lualib.h>
+}
 #include <cassert>
 #include <cstdio>
 #include <string>
@@ -14,6 +20,13 @@ namespace {
 
 std::vector<std::string> logLines;
 int liveGuards = 0;
+int clearedInteractions = 0;
+
+void __fastcall ClearInteractionStub(Game::Unit* player) {
+    ++clearedInteractions;
+    Game::PlayerData* data = static_cast<Game::PlayerData*>(player->data);
+    data->pending = data->queuedAction = data->targetType = data->targetGuid = 0;
+}
 
 struct Guard {
     Guard() { ++liveGuards; }
@@ -51,6 +64,38 @@ Script::ScriptHost MakeHost(const std::wstring& path) {
 }
 
 int main() {
+    {
+        Game::Unit player = {};
+        Game::PlayerData data = {};
+        player.type = Game::UnitType::Player;
+        player.data = &data;
+        data.pending = 1;
+        data.queuedAction = 0x13;
+        data.targetType = Game::UnitType::Object;
+        data.targetGuid = 42;
+        Game::CancelQueuedInteraction(&player, ClearInteractionStub);
+        assert(clearedInteractions == 1 && data.pending == 0 && data.queuedAction == 0
+            && data.targetType == 0 && data.targetGuid == 0);
+        // The dispatcher tests the opcode even if the pending flag is already clear.
+        data.queuedAction = 0x13;
+        Game::CancelQueuedInteraction(&player, ClearInteractionStub);
+        assert(clearedInteractions == 2 && data.queuedAction == 0);
+        data.pending = 1;
+        data.queuedAction = 5;
+        data.targetType = Game::UnitType::Monster;
+        data.targetGuid = 43;
+        Game::CancelQueuedInteraction(&player, ClearInteractionStub);
+        assert(clearedInteractions == 2 && data.pending == 1 && data.queuedAction == 5
+            && data.targetType == Game::UnitType::Monster && data.targetGuid == 43);
+        data.queuedAction = 0x13;
+        player.type = Game::UnitType::Monster;
+        Game::CancelQueuedInteraction(&player, ClearInteractionStub);
+        player.type = Game::UnitType::Player;
+        player.data = nullptr;
+        Game::CancelQueuedInteraction(&player, ClearInteractionStub);
+        Game::CancelQueuedInteraction(nullptr, ClearInteractionStub);
+        assert(clearedInteractions == 2 && data.queuedAction == 0x13);
+    }
     wchar_t temp[MAX_PATH];
     assert(GetTempPathW(MAX_PATH, temp));
     const std::wstring root = std::wstring(temp) + L"charon_script_host_test";
@@ -117,6 +162,32 @@ int main() {
         WriteFile(root + L"\\game\\syntax.lua", "function tick(\n");
         Script::ScriptHost host = MakeHost(root + L"\\game\\syntax.lua");
         assert(!host.Load() && host.Failed());
+    }
+
+    {
+        int packets = 0, points = 0;
+        auto send = [&](const uint8_t* packet, size_t size) {
+            assert(size == 3 && packet[0] == 0x3A && packet[1] == 3);
+            ++packets;
+            points += packet[2] + 1;
+        };
+        for (int count : { INT_MIN, -1, 0, 6, INT_MAX })
+            assert(!Script::SendStatPoints(3, count, 5, send));
+        assert(!Script::SendStatPoints(4, 1, 5, send));
+        assert(!Script::SendStatPoints(3, 1, 0, send));
+        assert(packets == 0);
+        assert(Script::SendStatPoints(3, 33, 33, send));
+        assert(packets == 2 && points == 33);
+    }
+    {
+        lua_State* L = luaL_newstate();
+        luaL_openlibs(L);
+        for (const auto& install : Script::ModulesFor(Script::InGame)) install(L);
+        if (luaL_dofile(L, CHARON_SOURCE_DIR "/tests/script_libraries.lua")) {
+            std::fprintf(stderr, "%s\n", lua_tostring(L, -1));
+            assert(false && "shared Lua library regressions");
+        }
+        lua_close(L);
     }
 
     std::puts("script host checks passed");

@@ -11,6 +11,7 @@
 #include <windows.h>
 #include <cstddef>
 #include <cstdint>
+#include "script_missiles.h"
 
 namespace Game {
 
@@ -20,6 +21,24 @@ struct Unit;
 struct Room1;
 struct Room2;
 struct Level;
+
+// Client table: *0x744304 + B64 pointer / B6C count; 0x4D3553..0x4D3567.
+struct MissilesTxt {
+    uint8_t pad00[0x08];
+    int16_t clientDo;        // 08 client frame handler
+    uint8_t pad0A[0x0C - 0x0A];
+    int16_t serverDo;        // 0C server handler index in the shared client table
+    uint8_t pad0E[0x183 - 0x0E];
+    uint8_t collideType;     // 183 player/monster collision mode
+    uint8_t pad184[0x18A - 0x184];
+    uint8_t size;            // 18A point / cross / 3x3; 0x620569
+    uint8_t pad18B[0x1A4 - 0x18B];
+};
+static_assert(offsetof(MissilesTxt, clientDo) == 0x08, "MissilesTxt client handler");
+static_assert(offsetof(MissilesTxt, serverDo) == 0x0C, "MissilesTxt server handler");
+static_assert(offsetof(MissilesTxt, collideType) == 0x183, "MissilesTxt collision mode");
+static_assert(offsetof(MissilesTxt, size) == 0x18A, "MissilesTxt footprint");
+static_assert(sizeof(MissilesTxt) == 0x1A4, "MissilesTxt stride");
 
 namespace UnitType {
 enum : uint32_t { Player = 0, Monster = 1, Object = 2, Missile = 3, Item = 4, Warp = 5 };
@@ -101,6 +120,30 @@ struct Unit {
 };
 static_assert(offsetof(Unit, path) == 0x2C && offsetof(Unit, stats) == 0x5C, "Unit layout");
 static_assert(offsetof(Unit, skills) == 0xA8 && offsetof(Unit, hashNext) == 0xE4, "Unit layout");
+static_assert(offsetof(Unit, data) == 0x14, "Unit data");
+
+struct PlayerData {
+    uint8_t pad00[0x150];
+    uint32_t pending;        // 150 deferred action present (0x460780 / 0x48162C)
+    uint32_t queuedAction;   // 154 client action opcode, not a skill id (0x4810A0)
+    uint32_t targetType;     // 158 deferred target unit type (0x48164B)
+    uint32_t targetGuid;     // 15C deferred target guid (0x48165D)
+};
+static_assert(offsetof(PlayerData, pending) == 0x150 && offsetof(PlayerData, queuedAction) == 0x154, "PlayerData action");
+static_assert(offsetof(PlayerData, targetType) == 0x158 && offsetof(PlayerData, targetGuid) == 0x15C, "PlayerData target");
+
+inline void CancelQueuedInteraction(Unit* player, void (__fastcall* clear)(Unit*)) {
+    if (player && player->type == UnitType::Player && player->data
+        && static_cast<PlayerData*>(player->data)->queuedAction == 0x13)
+        clear(player);
+}
+
+// Partial MonStats.txt row: DAMAGE_ApplyCold 0x57AFE6 sign-extends aColdEffect[difficulty].
+struct MonStatsCold {
+    uint8_t pad00[0x168];   // 00
+    int8_t coldEffect[3];   // 168 signed cold slow percentage, indexed by difficulty
+};
+static_assert(offsetof(MonStatsCold, coldEffect) == 0x168, "MonStats cold effect");
 
 struct MonsterData {
     uint8_t* monStats;       // 00 MonStatsTxt*
@@ -222,7 +265,14 @@ static_assert(sizeof(InputContext) == 0x20, "D2UnderMouseStrc is 0x20 bytes");
 #pragma pack(pop)
 
 // Globals.
+// Main-thread count of full quest records applied by the client (S2C 0x28/type 6).
+inline uint32_t QuestRecordRevision = 0;
 inline Unit** const PlayerUnit = reinterpret_cast<Unit**>(0x7A6A70);
+// D2Client's count of client frames: ClientSideGameLoop (0x44C790) adds one
+// per frame at 0x44C7F0..0x44C806. A frame is one step of the game's logic,
+// 25 a second at the stock rate; in single player the server steps in
+// lockstep with it at whatever rate the game is set to run.
+inline const uint32_t* const ClientFrame = reinterpret_cast<const uint32_t*>(0x7A0498);
 // D2Client's tables of units announced by the game server. The redivivus name
 // "ServerSide" means server-synchronized: this is client memory, present in
 // TCP/IP games. Index [type][guid & 127], chained through Unit::hashNext.
@@ -235,7 +285,13 @@ inline uint32_t* const UIFlags = reinterpret_cast<uint32_t*>(0x7A27C0);
 const int UIFlagCount = 0x26;
 
 // D2Common / D2Client functions (client copies of shared game logic).
+// 0x468990: no arguments, plain RET; checks leaving/death, then ECX=1 and tail-jumps
+// to QUESTLOG_ToggleQuestScreen (0x4A3FE0), which preserves ESI and returns without stack arguments.
+inline auto const ToggleQuestLog = reinterpret_cast<void(__stdcall*)()>(0x468990);
 inline auto const GetCoords = reinterpret_cast<void(__stdcall*)(Unit*, POINT*)>(0x620870);
+// Client shop eligibility: rejects quest/hammer items and vendor-owned stock.
+// 0x62A130 reads one stack Unit* and returns with RET 4; no UI or server state.
+inline auto const CanSellItem = reinterpret_cast<BOOL(__stdcall*)(Unit*)>(0x62A130);
 inline auto const GetUnitStat = reinterpret_cast<int32_t(__stdcall*)(Unit*, int stat, uint32_t layer)>(0x625480);
 inline auto const GetBaseStat = reinterpret_cast<int32_t(__stdcall*)(void* statsEx, int stat, uint32_t layer)>(0x625350);
 inline auto const GetUnitState = reinterpret_cast<uint32_t(__stdcall*)(Unit*, int state)>(0x639DF0);
@@ -250,6 +306,28 @@ inline auto const GetSkillLevel = reinterpret_cast<int(__stdcall*)(Unit*, Skill*
 inline auto const GetSkillByIdAndOwner = reinterpret_cast<Skill*(__fastcall*)(Unit*, int skillId, int ownerGuid)>(0x6439B0);
 inline auto const CanUseSkill = reinterpret_cast<int(__fastcall*)(Unit*, Skill*)>(0x4D9FC0);
 inline auto const PlayerCanBeInterrupted = reinterpret_cast<BOOL(__fastcall*)(Unit*, Skill*)>(0x464600);
+// INVENTORY_GetEquipActionForBodySlot: what a click on a body slot would do
+// with `item` on the cursor. 0 nothing (ITEMS_CheckBodyLocationFit says the
+// item does not go there, or, unless skipRequirements, ITEM_CheckEquipRequirements
+// says the unit cannot wear it); 1 into the empty slot; 5 swap with what is
+// there; in the weapon hands also 2 and 7, a two-handed weapon against one or
+// two held items, and 6, onto a stack. All four arguments on the stack (RET 0x10).
+inline auto const EquipActionForBodySlot = reinterpret_cast<int32_t(__stdcall*)(Unit* unit, uint32_t bodyLoc, Unit* item, int skipRequirements)>(0x63DE60);
+// The inventory screen's handlers for a click on a body slot, by body
+// location 1..10 (ClickItemHandler reads the table at 0x49157A: player in
+// ECX, inventory in EDX, the body location pushed, and the handler pops it).
+// With an item on the cursor they ask the function above, send the request
+// for its answer (0x1A, 0x1D, 0x1B, 0x1E) and take the item off the cursor.
+inline auto const BodySlotClick = reinterpret_cast<uint32_t(__fastcall* const*)(Unit* player, Inventory* inventory, uint32_t bodyLoc)>(0x721E58);
+// The cursor's mode, as GetItemType (0x468830) returns it: in 6 and 8 a click
+// on a body slot uses the cursor on the item worn there instead (0x27, 0x4C).
+inline auto const CursorMode = reinterpret_cast<const int32_t*>(0x7A6AF0);
+// What the character screen shows as Defense, and what the hit roll
+// (DAMAGE_RollAttackHit, 0x57D9B0) starts from. One stack argument, RET 4.
+inline auto const GetDefense = reinterpret_cast<int32_t(__stdcall*)(Unit*)>(0x6223F0);
+// Chance to block in percent, capped at 75, as the character screen shows it
+// and DAMAGE_CheckBlockAndEvasion rolls it. Two stack arguments, RET 8.
+inline auto const GetBlockRate = reinterpret_cast<int32_t(__stdcall*)(Unit*, BOOL expansion)>(0x622720);
 inline auto const SelectSkillLeft = reinterpret_cast<void(__stdcall*)(Unit*, int skillId, int ownerGuid)>(0x643BC0);
 inline auto const SelectSkillRight = reinterpret_cast<void(__stdcall*)(Unit*, int skillId, int ownerGuid)>(0x643C50);
 inline auto const ExecuteAction = reinterpret_cast<void(__fastcall*)(int action, Unit*, int a, int b, uint32_t unused)>(0x481030);
@@ -265,10 +343,16 @@ inline auto const GetLevelAndAlloc = reinterpret_cast<Level*(__stdcall*)(void* d
 inline auto const InitLevel = reinterpret_cast<void(__stdcall*)(Level*)>(0x6424A0);
 // Collision bits at a world subtile, resolved through the room's loaded neighbours.
 inline auto const CheckCollision = reinterpret_cast<uint32_t(__stdcall*)(Room1* room, int x, int y, uint32_t mask)>(0x64CB30);
+// Game.exe 1.14d: pickup branch 0x548C69 uses these with distance <= 4 and mask 0x804.
+// Disassembly confirms stack arguments and RET 8 / RET 12, respectively.
+inline auto const UnitDistance = reinterpret_cast<int(__stdcall*)(Unit*, Unit*)>(0x641530);
+inline auto const InteractingCollision = reinterpret_cast<BOOL(__stdcall*)(Unit*, Unit*, int mask)>(0x622B50);
 inline auto const CoordsMapToScreen = reinterpret_cast<void(__stdcall*)(int* x, int* y)>(0x643260);
 
 // Entry points with custom register contracts (assembly adapters in script_game.cpp).
 BOOL MovePlayerTo(Unit* player, int x, int y, int action);
+// Client-only game type getter 0x44DB30: no args, EAX result, plain RET.
+int ClientGameType();
 void UseBeltSlot(Unit* player, int slot, bool toMercenary);
 void InteractWithUnit(Unit* player, Unit* target);
 const wchar_t* LocaleString(uint16_t id);

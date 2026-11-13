@@ -9,11 +9,20 @@
 #include "headers/script_game.h"
 #include "headers/script_host.h"
 #include "headers/utilities.h"
+#include "headers/player_count.h"
 #include <cmath>
 
 namespace Game {
 
+int ClientGameType() {
+    return reinterpret_cast<int(*)()>(0x44DB30)();
+}
+
 BOOL MovePlayerTo(Unit* player, int x, int y, int action) {
+    // New ground clicks clear queued interactions in 0x4621D0 before moving;
+    // otherwise 0x481030 suppresses location movement while action 0x13 remains.
+    // 0x45C470: ECX=player, plain RET; clears only PlayerData 0x150..0x15C.
+    CancelQueuedInteraction(player, reinterpret_cast<void(__fastcall*)(Unit*)>(0x45C470));
     // CLIENT_MovePlayerToPosition: EDI=player, CX=x, AX=y, stack(action), RET 4.
     const DWORD function = 0x461840;
     BOOL result;
@@ -89,7 +98,10 @@ Unit* FindUnit(uint32_t type, uint32_t guid) {
     if (type >= UnitTypeCount) return nullptr;
     Unit* player = Player();
     if (type == UnitType::Player && player && player->guid == guid) return player;
-    for (Unit* unit = SyncedUnits[type][guid & 127]; unit; unit = unit->hashNext) {
+    // D2Client resolves missile IDs in its local-effects table (0x4639D0),
+    // and other world IDs in the server-synchronized client table.
+    Unit** table = type == UnitType::Missile ? LocalUnits[type] : SyncedUnits[type];
+    for (Unit* unit = table[guid & 127]; unit; unit = unit->hashNext) {
         if (unit->guid == guid && unit->type == type) return unit;
     }
     return nullptr;
@@ -300,6 +312,7 @@ void PushUnit(lua_State* L, Unit* unit) {
     if (!carried && Position(unit, x, y)) {
         Script::SetField(L, "x", x);
         Script::SetField(L, "y", y);
+        Script::SetField(L, "area", UnitLevelId(unit)); // shared client path -> room -> level
     }
     switch (unit->type) {
     case UnitType::Player:
@@ -321,6 +334,19 @@ void PushUnit(lua_State* L, Unit* unit) {
         PushItem(L, unit);
         break;
     case UnitType::Missile:
+        {
+            const uint8_t* tables = *reinterpret_cast<uint8_t* const*>(0x744304);
+            const MissilesTxt* rows = tables ? *reinterpret_cast<MissilesTxt* const*>(tables + 0xB64) : nullptr;
+            const int count = tables ? *reinterpret_cast<const int*>(tables + 0xB6C) : 0;
+            if (rows && unit->classId >= 0 && unit->classId < count) {
+                const MissilesTxt& row = rows[unit->classId];
+                const int size = GroundFireSize(unit->classId, row.clientDo, row.serverDo, row.collideType, row.size);
+                if (size) {
+                    Script::SetField(L, "ground_fire", true);
+                    Script::SetField(L, "ground_size", size);
+                }
+            }
+        }
         if (unit->flagsEx & 0x400) {
             Script::SetField(L, "owner_type", int(unit->ownerType));
             Script::SetField(L, "owner", double(unit->ownerGuid));
@@ -382,8 +408,9 @@ int GameUnits(lua_State* L) {
     lua_newtable(L);
     int count = 0;
     for (int type = first; type <= last; ++type) {
+        Unit** table = type == UnitType::Missile ? LocalUnits[type] : SyncedUnits[type];
         for (int bucket = 0; bucket < 128; ++bucket) {
-            for (Unit* unit = SyncedUnits[type][bucket]; unit && count < 4096; unit = unit->hashNext) {
+            for (Unit* unit = table[bucket]; unit && count < 4096; unit = unit->hashNext) {
                 if (unit == player || unit->type != (uint32_t)type) continue;
                 PushUnit(L, unit);
                 lua_rawseti(L, -2, ++count);
@@ -643,9 +670,17 @@ int CurrentDifficulty() {
     return *Game::Difficulty > 2 ? 2 : *Game::Difficulty;
 }
 
-// Monster life and experience at a monster level, as D2Common scales them with
-// MonLvl.txt: the expansion columns follow the classic ones; noRatio rows are raw.
-void ScaledMonsterStats(const uint8_t* row, int monsterLevel, int& minLife, int& maxLife, int& experience) {
+// Monster life, experience and attack damage at a monster level, as D2Common
+// scales them with MonLvl.txt: the expansion columns follow the classic ones;
+// noRatio rows are raw (MONSTER_CalculateLevelScaledStats, 0x6538A0, applies the
+// same percent-of-MonLvl rule to life, experience and each attack's damage).
+// Offsets are D2MonStatsTxt / D2MonLvlTxt in Redivivus:
+// aMinHP 0xB0, aMaxHP 0xB6, aExp 0xD4, aA1MinD 0xDA, aA1MaxD 0xE0, aA2MinD 0xE6,
+// aA2MaxD 0xEC, aS1MinD 0xF2, aS1MaxD 0xF8 (short[3] by difficulty); MonLvl HP
+// 0x30, DM 0x48, XP 0x60 (int[3], then the expansion's three).
+// damage[] receives A1 min/max, A2 min/max, S1 min/max.
+void ScaledMonsterStats(const uint8_t* row, int monsterLevel, int& minLife, int& maxLife, int& experience,
+    int damage[6]) {
     const int difficulty = CurrentDifficulty();
     const int16_t* minHp = reinterpret_cast<const int16_t*>(row + 0x0B0);
     const int16_t* maxHp = reinterpret_cast<const int16_t*>(row + 0x0B6);
@@ -653,6 +688,7 @@ void ScaledMonsterStats(const uint8_t* row, int monsterLevel, int& minLife, int&
     minLife = minHp[difficulty];
     maxLife = maxHp[difficulty];
     experience = exp[difficulty];
+    for (int i = 0; i < 6; ++i) damage[i] = reinterpret_cast<const int16_t*>(row + 0x0DA + i * 6)[difficulty];
     if (row[0x0C] & 0x04) return;
     int count;
     const int32_t* monLvl = TxtTable<int32_t>(0xB70, 0xB74, count);
@@ -663,6 +699,51 @@ void ScaledMonsterStats(const uint8_t* row, int monsterLevel, int& minLife, int&
     minLife = int(int64_t(entry[0x30 / 4 + column]) * minLife / 100);
     maxLife = int(int64_t(entry[0x30 / 4 + column]) * maxLife / 100);
     experience = int(int64_t(entry[0x60 / 4 + column]) * experience / 100);
+    for (int i = 0; i < 6; ++i) damage[i] = int(int64_t(entry[0x48 / 4 + column]) * damage[i] / 100);
+}
+
+// game.hit_chance(classId [, monsterLevel]) -> percent, block percent: the
+// chance that a blow from a monster of this class lands on the player, as
+// the game works it out. The character screen does this for the monster it
+// names (UI_BuildStatWindowDescriptions, 0x4A74A0): the class's to-hit
+// (MonStats A1TH, else A2TH, else S1TH, at +0xC2/+0xC8/+0xCE by difficulty,
+// scaled by MonLvl's TH column at +0x18 unless noRatio) against the
+// player's defence (GetDefense plus the stat for defence against melee,
+// 33), times twice the monster's level over both levels. The roll itself
+// (DAMAGE_RollAttackHit, 0x57D9B0) holds the result between 5 and 95. The
+// second value is the player's chance to block (GetBlockRate), a separate roll.
+int GameHitChance(lua_State* L) {
+    Unit* player = Player();
+    if (!player) throw Script::Error("not in game");
+    const int classId = Script::ArgInt(L, 1);
+    const uint8_t* row = MonStatsRow(classId);
+    if (!row) return 0;
+    const int difficulty = CurrentDifficulty();
+    const int level = Script::OptInt(L, 2, reinterpret_cast<const int16_t*>(row + 0x0AA)[difficulty]);
+    int scale = 100;
+    if (!(row[0x0C] & 0x04)) {
+        int count;
+        const int32_t* monLvl = TxtTable<int32_t>(0xB70, 0xB74, count);
+        if (monLvl && count > 0) {
+            const int index = level < 0 ? 0 : level >= count ? count - 1 : level;
+            scale = monLvl[size_t(index) * (0x78 / 4) + 0x18 / 4 + (*Game::ExpansionGame ? 3 : 0) + difficulty];
+        }
+    }
+    int toHit = 0;
+    for (int offset : { 0xC2, 0xC8, 0xCE }) {
+        toHit = int(int64_t(scale) * reinterpret_cast<const int16_t*>(row + offset)[difficulty] / 100);
+        if (toHit != 0) break;
+    }
+    int defense = GetDefense(player) + GetUnitStat(player, 33, 0);
+    if (defense < 0) { toHit -= defense; defense = 0; }
+    if (toHit < 0) { defense -= toHit; toHit = 0; }
+    const int ratio = toHit + defense == 0 ? 100 : toHit * 100 / (toHit + defense);
+    const int own = GetUnitStat(player, 12, 0); // level
+    int chance = level + own > 0 ? level * ratio * 2 / (level + own) : 95;
+    chance = chance < 5 ? 5 : chance > 95 ? 95 : chance;
+    lua_pushinteger(L, chance);
+    lua_pushinteger(L, GetBlockRate(player, *Game::ExpansionGame ? TRUE : FALSE));
+    return 2;
 }
 
 // game.monster_info(classId [, monsterLevel]) -> MonStats facts for the current
@@ -675,8 +756,8 @@ int GameMonsterInfo(lua_State* L) {
     const int difficulty = CurrentDifficulty();
     const int ownLevel = reinterpret_cast<const int16_t*>(row + 0x0AA)[difficulty];
     const int level = Script::OptInt(L, 2, ownLevel);
-    int minLife, maxLife, experience;
-    ScaledMonsterStats(row, level, minLife, maxLife, experience);
+    int minLife, maxLife, experience, damage[6];
+    ScaledMonsterStats(row, level, minLife, maxLife, experience, damage);
     lua_newtable(L);
     Script::SetField(L, "class_id", classId);
     Script::SetField(L, "name", WideToUtf8(LocaleString(*reinterpret_cast<const uint16_t*>(row + 0x06))));
@@ -685,18 +766,27 @@ int GameMonsterInfo(lua_State* L) {
     Script::SetField(L, "min_life", minLife);
     Script::SetField(L, "max_life", maxLife);
     Script::SetField(L, "experience", experience);
+    // Physical damage per hit before the player's defenses: the two attack
+    // modes and the first skill (elemental additions are not included).
+    static const char* damageNames[6] = { "attack_min", "attack_max", "attack2_min", "attack2_max",
+        "skill_min", "skill_max" };
+    for (int i = 0; i < 6; ++i) Script::SetField(L, damageNames[i], damage[i]);
+    Script::SetField(L, "melee", (row[0x0C] & 0x02) != 0);
     static const char* resistNames[6] = { "physical", "magic", "fire", "lightning", "cold", "poison" };
     lua_newtable(L);
     for (int i = 0; i < 6; ++i) {
         Script::SetField(L, resistNames[i], int(reinterpret_cast<const int16_t*>(row + 0x144 + i * 6)[difficulty]));
     }
     lua_setfield(L, -2, "resist");
+    Script::SetField(L, "cold_effect", int(reinterpret_cast<const MonStatsCold*>(row)->coldEffect[difficulty]));
     Script::SetField(L, "boss", (row[0x0C] & 0x40) != 0);
     Script::SetField(L, "npc", (row[0x0D] & 0x01) != 0);
     Script::SetField(L, "undead", (row[0x0D] & 0x18) != 0);
     Script::SetField(L, "demon", (row[0x0D] & 0x20) != 0);
     Script::SetField(L, "killable", (row[0x0D] & 0x80) != 0);
+    Script::SetField(L, "ranged", (row[0x0F] & 0x10) != 0); // as a unit snapshot's `ranged`
     Script::SetField(L, "speed", int(*reinterpret_cast<const int16_t*>(row + 0x032)));
+    Script::SetField(L, "threat", int(row[0x4E])); // MonStats.txt threat: what the game's own AI ranks targets by
     return 1;
 }
 
@@ -755,6 +845,12 @@ void PushQuest(lua_State* L, uint16_t bits) {
     Script::SetField(L, "completed_this_game", (bits & 0x2000) != 0);
     Script::SetField(L, "blocked_this_game", (bits & 0x4000) != 0);
     Script::SetField(L, "started", (bits & 0x0FFF) != 0);
+}
+
+// Counts applied full records, including replies whose quest bits did not change.
+int GameQuestRevision(lua_State* L) {
+    lua_pushnumber(L, QuestRecordRevision);
+    return 1;
 }
 
 // game.quest(id) -> quest state table, or nil before the record arrives.
@@ -840,9 +936,20 @@ int GameScreen(lua_State* L) {
     return 2;
 }
 
+int GamePlayers(lua_State* L) {
+    const CharonPlayers::State state = CharonPlayers::Configured();
+    const bool supported = Player() && CharonPlayers::Supported(ClientGameType());
+    lua_createtable(L, 0, 3);
+    Script::SetField(L, "supported", supported);
+    if (supported) Script::SetField(L, "configured", static_cast<double>(state.configured));
+    Script::SetField(L, "revision", static_cast<double>(state.revision));
+    return 1;
+}
+
 const bool registered = (Script::RegisterModule(Script::InGame, [](lua_State* L) {
     static const luaL_Reg functions[] = {
         { "ready", Script::Bind<GameReady> },
+        { "players", Script::Bind<GamePlayers> },
         { "me", Script::Bind<GameMe> },
         { "units", Script::Bind<GameUnits> },
         { "unit", Script::Bind<GameUnit> },
@@ -860,8 +967,10 @@ const bool registered = (Script::RegisterModule(Script::InGame, [](lua_State* L)
         { "level_name", Script::Bind<GameLevelName> },
         { "object_info", Script::Bind<GameObjectInfo> },
         { "monster_info", Script::Bind<GameMonsterInfo> },
+        { "hit_chance", Script::Bind<GameHitChance> },
         { "level_info", Script::Bind<GameLevelInfo> },
         { "quest", Script::Bind<GameQuest> },
+        { "quest_revision", Script::Bind<GameQuestRevision> },
         { "waypoints", Script::Bind<GameWaypoints> },
         { "difficulty_info", Script::Bind<GameDifficultyInfo> },
         { "locale", Script::Bind<GameLocale> },

@@ -12,6 +12,7 @@
 #define NOMINMAX
 #include "headers/common.h"
 #include "headers/pathfinding.h"
+#include "headers/script_collision.h"
 #include "headers/remote.h"
 #include "headers/script_game.h"
 #include "headers/script_host.h"
@@ -26,13 +27,12 @@ using namespace Game;
 
 namespace {
 
-// PLAYER_COLLISION_DEFAULT: walls, no-player areas, objects, doors and no-path cells.
-const uint16_t BlockMask = 0x1C09;
 const int Clearance = 1;
 const int DefaultStep = 15;
 const int DoorRadius = 2;
 // Collision a closed door adds (0x806, 0x804 or 0x400), within BlockMask.
 const uint16_t DoorBits = 0x0C00;
+const uint16_t ObjectBit = 0x0400; // the collision an object adds
 // Live collision that stops the player: the static mask plus monster occupancy
 // (0x0100). Missing or unloaded rooms answer 0x27, which counts as blocked.
 const uint32_t LiveMask = BlockMask | 0x0100;
@@ -124,20 +124,68 @@ Level* FindLevel(Unit* player, int id) {
     return level;
 }
 
-void CopyCollision(LevelInfo& info, Room1* room) {
+void CopyCollision(LevelInfo& info, Room1* room, Unit* player) {
     const CollisionGrid* collision = room ? room->collision : nullptr;
     if (!collision || !collision->cells || collision->width <= 0 || collision->height <= 0) return;
+    double playerX, playerY;
+    Position(player, playerX, playerY);
+    const int ownX = (int)std::floor(playerX), ownY = (int)std::floor(playerY);
+    const bool ownLevel = info.id == UnitLevelId(player);
     for (int cy = 0; cy < collision->height; ++cy) {
         for (int cx = 0; cx < collision->width; ++cx) {
             const int x = collision->x + cx, y = collision->y + cy;
             if (!info.raw.Contains(x, y)) continue;
             const size_t index = info.raw.Index(x, y);
-            const uint16_t bits = collision->cells[size_t(cy) * collision->width + cx] & BlockMask;
+            const uint16_t bits = SnapshotCollision(collision->cells[size_t(cy) * collision->width + cx],
+                ownLevel && x == ownX && y == ownY);
             info.raw.blocked[index] = bits ? 1 : 0;
             info.doorOnly[index] = bits && !(bits & ~DoorBits) ? 1 : 0;
             info.raw.level[index] = (uint16_t)info.id;
         }
     }
+}
+
+// Closed doors block in the snapshot; plan through their doorways and let
+// scripts open them on the way (map.doors). Only cells blocked by nothing
+// but door/object collision are cleared, so walls beside a door stay solid.
+void OpenDoorways(LevelInfo& info) {
+    for (const DoorInfo& door : info.doors) {
+        for (int y = door.y - DoorRadius; y <= door.y + DoorRadius; ++y) {
+            for (int x = door.x - DoorRadius; x <= door.x + DoorRadius; ++x) {
+                if (info.raw.LevelAt(x, y) != info.id) continue;
+                const size_t index = info.raw.Index(x, y);
+                if (info.doorOnly[index]) info.raw.blocked[index] = 0;
+            }
+        }
+    }
+}
+
+// Object collision as the room has it now, into a snapshot taken earlier:
+// cells an object has come to block, and cells that only an object blocked
+// and no longer does. Walls and the rest are left as copied. True on a change.
+bool CopyObjects(LevelInfo& info, Room1* room) {
+    const CollisionGrid* collision = room ? room->collision : nullptr;
+    if (!collision || !collision->cells || collision->width <= 0 || collision->height <= 0) return false;
+    bool changed = false;
+    for (int cy = 0; cy < collision->height; ++cy) {
+        for (int cx = 0; cx < collision->width; ++cx) {
+            const int x = collision->x + cx, y = collision->y + cy;
+            if (info.raw.LevelAt(x, y) != info.id) continue;
+            const size_t index = info.raw.Index(x, y);
+            const uint16_t bits = collision->cells[size_t(cy) * collision->width + cx] & BlockMask;
+            if ((bits & ObjectBit) && !info.raw.blocked[index]) {
+                info.raw.blocked[index] = 1;
+                info.doorOnly[index] = !(bits & ~DoorBits) ? 1 : 0;
+                changed = true;
+            }
+            else if (!bits && info.raw.blocked[index] && info.doorOnly[index]) {
+                info.raw.blocked[index] = 0;
+                info.doorOnly[index] = 0;
+                changed = true;
+            }
+        }
+    }
+    return changed;
 }
 
 void CopyRoomData(LevelInfo& info, Room2* room) {
@@ -187,25 +235,14 @@ LevelInfo& LoadLevel(Unit* player, int id) {
     std::vector<int> adjacent;
     for (Room2* room = level->firstRoom; room; room = room->next) {
         if (!room->room1) AddRoomData(act, id, room->tileX, room->tileY, nullptr);
-        CopyCollision(*info, room->room1);
+        CopyCollision(*info, room->room1, player);
         CopyRoomData(*info, room);
         for (int i = 0; i < room->nearCount && room->nearRooms; ++i) {
             Room2* neighbour = room->nearRooms[i];
             if (neighbour && neighbour->level && neighbour->level->id != id) adjacent.push_back(neighbour->level->id);
         }
     }
-    // Closed doors block in the snapshot; plan through their doorways and let
-    // scripts open them on the way (map.doors). Only cells blocked by nothing
-    // but door/object collision are cleared, so walls beside a door stay solid.
-    for (const DoorInfo& door : info->doors) {
-        for (int y = door.y - DoorRadius; y <= door.y + DoorRadius; ++y) {
-            for (int x = door.x - DoorRadius; x <= door.x + DoorRadius; ++x) {
-                if (info->raw.LevelAt(x, y) != id) continue;
-                const size_t index = info->raw.Index(x, y);
-                if (info->doorOnly[index]) info->raw.blocked[index] = 0;
-            }
-        }
-    }
+    OpenDoorways(*info);
     std::sort(adjacent.begin(), adjacent.end());
     adjacent.erase(std::unique(adjacent.begin(), adjacent.end()), adjacent.end());
     for (int other : adjacent) {
@@ -257,9 +294,38 @@ const Pathing::Grid& GridFor(Unit* player, std::vector<int> ids, bool exact = fa
     return cached;
 }
 
+// A level is copied with the rooms the map module activated itself, and the
+// game puts an object's collision (a torch stand, a sarcophagus, a barrel)
+// into a room only when it spawns the object there, as the player comes
+// near. So the rooms around her are read again as she goes, and the merged
+// grids dropped when an object has appeared or gone. Planned over the first
+// copy, steps led into torch stands in the Den: accepted, and not walked.
+const uint32_t RefreshFrames = 8;
+void RefreshNear(Unit* player) {
+    static uint32_t last = 0;
+    const uint32_t frame = *ClientFrame;
+    if (frame - last < RefreshFrames) return;
+    last = frame;
+    ResetIfActChanged(player);
+    const auto found = cache.levels.find(UnitLevelId(player));
+    Room1* here = UnitRoom(player);
+    if (found == cache.levels.end() || !here) return;
+    LevelInfo& info = *found->second;
+    bool changed = CopyObjects(info, here);
+    for (int i = 0; i < here->nearCount && here->nearRooms; ++i) {
+        Room1* beside = here->nearRooms[i];
+        if (beside && beside != here) changed = CopyObjects(info, beside) || changed;
+    }
+    if (!changed) return;
+    OpenDoorways(info);
+    cache.gridLevels.clear();
+    cache.tightLevels.clear();
+}
+
 Unit* RequirePlayer() {
     Unit* player = Player();
     if (!player || !UnitLevelId(player)) throw Script::Error("not in game");
+    RefreshNear(player);
     return player;
 }
 
@@ -297,13 +363,46 @@ Pathing::Point PlayerCell(Unit* player) {
 }
 
 // Pushes waypoints (excluding the start) or nil + reason.
-int PushPath(lua_State* L, const Pathing::Grid& grid, Pathing::Point start, std::vector<Pathing::Point> cells, int step) {
+// {avoid = {{x=, y=, radius=}, ...}}: ground to keep off when another way exists.
+std::vector<Pathing::Zone> OptionAvoid(lua_State* L, int index) {
+    if (lua_type(L, index) != LUA_TTABLE) return {};
+    Script::RawField(L, index, "avoid");
+    std::vector<Pathing::Zone> zones;
+    if (lua_type(L, -1) == LUA_TTABLE) {
+        const int count = std::min(64, (int)lua_objlen(L, -1));
+        for (int i = 1; i <= count; ++i) {
+            lua_rawgeti(L, -1, i);
+            if (lua_type(L, -1) == LUA_TTABLE) {
+                Pathing::Zone zone;
+                Script::RawField(L, -1, "x"); zone.x = lua_tonumber(L, -1); lua_pop(L, 1);
+                Script::RawField(L, -1, "y"); zone.y = lua_tonumber(L, -1); lua_pop(L, 1);
+                Script::RawField(L, -1, "radius"); zone.radius = std::min(40.0, lua_tonumber(L, -1)); lua_pop(L, 1);
+                if (zone.radius > 0) zones.push_back(zone);
+            }
+            lua_pop(L, 1);
+        }
+    }
+    lua_pop(L, 1);
+    return zones;
+}
+
+// A way around the zones is taken when it is not much longer than the way
+// through: a pack is not worth a walk around the whole level. The search is
+// bounded as well, because a zone that closes the only passage would
+// otherwise flood every cell on this side of it within the tick.
+const size_t DetourExpansions = 150000;
+bool WorthDetour(size_t detour, size_t direct) { return detour <= direct * 2 + 60; }
+
+// `padded` is given for a path found by FindPathSqueezing on the exact `grid`.
+int PushPath(lua_State* L, const Pathing::Grid& grid, Pathing::Point start, std::vector<Pathing::Point> cells, int step,
+    const Pathing::Grid* padded = nullptr) {
     if (cells.empty()) {
         lua_pushnil(L);
         lua_pushstring(L, "no path");
         return 2;
     }
-    const std::vector<Pathing::Point> waypoints = Pathing::Simplify(grid, cells, step);
+    const std::vector<Pathing::Point> waypoints = padded ? Pathing::SimplifySqueezing(grid, *padded, cells, step)
+        : Pathing::Simplify(grid, cells, step);
     lua_createtable(L, (int)waypoints.size(), 0);
     int index = 0;
     for (size_t i = 1; i < waypoints.size(); ++i) {
@@ -317,12 +416,42 @@ int PushPath(lua_State* L, const Pathing::Grid& grid, Pathing::Point start, std:
     return 1;
 }
 
-bool StartCell(const Pathing::Grid& grid, Unit* player, Pathing::Point& start) {
-    // The clearance margin can cover the player's own cell near walls.
-    return Pathing::NearestPassable(grid, PlayerCell(player), 4, start);
+const Pathing::Grid* DepartureGrid(lua_State* L, Unit* player, const Pathing::Grid& exact, Pathing::Point actual, Pathing::Grid& departure) {
+    if (exact.Passable(actual.x, actual.y)) return &exact;
+    Room1* room = UnitRoom(player);
+    const uint32_t collision = room ? CheckCollision(room, actual.x, actual.y, 0xFFFF) : 0xFFFF;
+    // Native PATH_RemoveUnitCollision (0x649560 -> 0x64EC10) clears the player's
+    // 0x80 footprint and 0x1000 center before searching; retain every other blocker.
+    if (collision & (BlockMask & ~0x1000)) return nullptr;
+    departure = exact;
+    if (!Pathing::OpenMovementStart(departure, actual)) return nullptr;
+    if (auto host = Script::HostFor(L)) host->Log("map: departing blocked cell (" + std::to_string(actual.x)
+        + "," + std::to_string(actual.y) + "), live collision="
+        + std::to_string(collision));
+    return &departure;
 }
 
-// map.path(x, y [, {step=, levels={...}}]) -> waypoints | nil, reason
+// The margin can cover the cell we stand in (a stair landing beside a wall)
+// while open ground lies next to it. Then only that cell is opened and the
+// margin kept for the rest of the way. Planned on the exact grid instead, the
+// whole route hugged the walls: from the stairs of one Tower cellar its first
+// step led into a corner the game would not walk her into, the request was
+// accepted and nothing moved, and the descent was given up in every game.
+bool MarginDeparture(const Pathing::Grid& padded, Pathing::Point actual, Pathing::Grid& opened) {
+    if (padded.Passable(actual.x, actual.y)) return false;
+    opened = padded;
+    return Pathing::OpenMovementStart(opened, actual);
+}
+
+int BlockedMovementStart(lua_State* L, Unit* player, Pathing::Point actual) {
+    Room1* room = UnitRoom(player);
+    lua_pushnil(L);
+    lua_pushfstring(L, "player cannot leave cell (%d,%d), live collision=%d", actual.x, actual.y,
+        room ? (int)CheckCollision(room, actual.x, actual.y, 0xFFFF) : -1);
+    return 2;
+}
+
+// map.path(x, y [, {step=, levels={...}, avoid={{x=,y=,radius=},...}}]) -> waypoints [, true when it goes around every zone] | nil, reason
 int MapPath(lua_State* L) {
     Unit* player = RequirePlayer();
     const Pathing::Point target = { (int)std::floor(Script::ArgNumber(L, 1)), (int)std::floor(Script::ArgNumber(L, 2)) };
@@ -342,31 +471,48 @@ int MapPath(lua_State* L) {
         }
     }
     const Pathing::Grid& full = GridFor(player, levels);
+    const Pathing::Point actual = PlayerCell(player);
     Pathing::Point start, goal;
-    if (!StartCell(full, player, start)) {
-        lua_pushnil(L);
-        lua_pushstring(L, "player is not on a walkable cell");
-        return 2;
-    }
-    if (!Pathing::NearestPassable(full, target, 6, goal)) {
-        lua_pushnil(L);
-        lua_pushstring(L, "target is not walkable");
-        return 2;
-    }
-    std::vector<Pathing::Point> cells = Pathing::FindPath(full, start, goal);
-    if (cells.empty()) {
-        // The margin can close narrow passages: try the exact grid before giving up.
-        const Pathing::Grid& exact = GridFor(player, levels, true);
-        Pathing::Point tightStart, tightGoal;
-        if (StartCell(exact, player, tightStart) && Pathing::NearestPassable(exact, target, 6, tightGoal)) {
-            cells = Pathing::FindPath(exact, tightStart, tightGoal);
-            if (!cells.empty()) return PushPath(L, exact, tightStart, cells, step);
+    std::vector<Pathing::Point> cells;
+    if (Pathing::MovementStart(full, actual, start) && Pathing::NearestPassable(full, target, 6, goal))
+        cells = Pathing::FindPath(full, start, goal);
+    const std::vector<Pathing::Zone> avoid = OptionAvoid(L, 3);
+    if (!cells.empty() && !avoid.empty()) {
+        Pathing::Grid around = full;
+        if (Pathing::BlockZones(around, avoid, start, &goal)) {
+            const std::vector<Pathing::Point> detour = Pathing::FindPath(around, start, goal, DetourExpansions);
+            if (!detour.empty() && WorthDetour(detour.size(), cells.size())) {
+                PushPath(L, around, start, detour, step);
+                lua_pushboolean(L, 1);
+                return 2;
+            }
         }
+    }
+    if (cells.empty()) {
+        Pathing::Grid opened;
+        if (MarginDeparture(full, actual, opened) && Pathing::NearestPassable(opened, target, 6, goal)) {
+            cells = Pathing::FindPath(opened, actual, goal);
+            if (!cells.empty()) return PushPath(L, opened, actual, cells, step);
+        }
+        // The margin can close a narrow passage.
+        const Pathing::Grid& exact = GridFor(player, levels, true);
+        Pathing::Grid departure;
+        const Pathing::Grid* movement = DepartureGrid(L, player, exact, actual, departure);
+        if (!movement) return BlockedMovementStart(L, player, actual);
+        Pathing::Point tightGoal;
+        if (!Pathing::NearestPassable(*movement, target, 6, tightGoal)) {
+            lua_pushnil(L);
+            lua_pushstring(L, "target is not walkable");
+            return 2;
+        }
+        cells = Pathing::FindPathSqueezing(*movement, full, actual,
+            [tightGoal](int x, int y) { return x == tightGoal.x && y == tightGoal.y; }, tightGoal);
+        return PushPath(L, *movement, actual, cells, step, &full);
     }
     return PushPath(L, full, start, cells, step);
 }
 
-// map.path_to_level(levelId [, {step=}]) -> waypoints ending inside the level | nil, reason
+// map.path_to_level(levelId [, {step=, avoid=}]) -> waypoints ending inside the level [, true] | nil, reason
 int MapPathToLevel(lua_State* L) {
     Unit* player = RequirePlayer();
     const int target = Script::ArgInt(L, 1);
@@ -374,12 +520,8 @@ int MapPathToLevel(lua_State* L) {
     const int here = UnitLevelId(player);
     const Pathing::Grid& grid = GridFor(player, { here, target });
     const LevelInfo& info = LoadLevel(player, target);
+    const Pathing::Point actual = PlayerCell(player);
     Pathing::Point start;
-    if (!StartCell(grid, player, start)) {
-        lua_pushnil(L);
-        lua_pushstring(L, "player is not on a walkable cell");
-        return 2;
-    }
     // Aim a few cells past the border so the player is clearly inside.
     const Pathing::Point hint = { info.x + info.width / 2, info.y + info.height / 2 };
     auto inside = [&grid, target](int x, int y) {
@@ -390,23 +532,43 @@ int MapPathToLevel(lua_State* L) {
         }
         return true;
     };
-    std::vector<Pathing::Point> cells = Pathing::FindPath(grid, start, inside, hint);
+    std::vector<Pathing::Point> cells;
+    if (Pathing::MovementStart(grid, actual, start)) cells = Pathing::FindPath(grid, start, inside, hint);
+    const std::vector<Pathing::Zone> avoid = OptionAvoid(L, 2);
+    if (!cells.empty() && !avoid.empty()) {
+        Pathing::Grid around = grid;
+        if (Pathing::BlockZones(around, avoid, start, &cells.back())) {
+            const std::vector<Pathing::Point> detour = Pathing::FindPath(around, start, inside, hint, DetourExpansions);
+            if (!detour.empty() && WorthDetour(detour.size(), cells.size())) {
+                PushPath(L, around, start, detour, step);
+                lua_pushboolean(L, 1);
+                return 2;
+            }
+        }
+    }
     if (cells.empty()) {
+        Pathing::Grid opened;
+        if (MarginDeparture(grid, actual, opened)) {
+            cells = Pathing::FindPath(opened, actual, inside, hint);
+            if (!cells.empty()) return PushPath(L, opened, actual, cells, step);
+        }
         // The margin can close narrow passages (gates): try the exact grid.
         const Pathing::Grid& exact = GridFor(player, { here, target }, true);
-        Pathing::Point tightStart;
-        if (StartCell(exact, player, tightStart)) {
-            auto insideExact = [&exact, target](int x, int y) {
+        Pathing::Grid departure;
+        const Pathing::Grid* movement = DepartureGrid(L, player, exact, actual, departure);
+        if (movement) {
+            auto insideExact = [movement, target](int x, int y) {
                 for (int dy = -3; dy <= 3; ++dy) {
                     for (int dx = -3; dx <= 3; ++dx) {
-                        if (exact.LevelAt(x + dx, y + dy) != target) return false;
+                        if (movement->LevelAt(x + dx, y + dy) != target) return false;
                     }
                 }
-                return exact.Passable(x, y);
+                return movement->Passable(x, y);
             };
-            cells = Pathing::FindPath(exact, tightStart, insideExact, hint);
-            if (!cells.empty()) return PushPath(L, exact, tightStart, cells, step);
+            cells = Pathing::FindPathSqueezing(*movement, grid, actual, insideExact, hint);
+            return PushPath(L, *movement, actual, cells, step, &grid);
         }
+        return BlockedMovementStart(L, player, actual);
     }
     return PushPath(L, grid, start, cells, step);
 }
@@ -435,10 +597,46 @@ double RawNumber(lua_State* L, int index, const char* key, double fallback) {
     return value;
 }
 
+std::vector<Pathing::GroundHazard> ReadGroundHazards(lua_State* L, int index) {
+    if (lua_type(L, index) != LUA_TTABLE) throw Script::Error("hazards must be a table");
+    const size_t count = lua_objlen(L, index);
+    if (count > 128) throw Script::Error("at most 128 ground hazards are supported");
+    std::vector<Pathing::GroundHazard> hazards;
+    for (size_t i = 1; i <= count; ++i) {
+        lua_rawgeti(L, index, (int)i);
+        if (lua_type(L, -1) != LUA_TTABLE) throw Script::Error("ground hazard must be a table");
+        const double x = RawNumber(L, -1, "x", NAN), y = RawNumber(L, -1, "y", NAN);
+        const double size = RawNumber(L, -1, "size", NAN);
+        if (!std::isfinite(x) || !std::isfinite(y) || std::abs(x) > 65535 || std::abs(y) > 65535)
+            throw Script::Error("ground hazard coordinates must be finite world coordinates");
+        if (!std::isfinite(size) || size < 1 || size > 3 || size != std::floor(size))
+            throw Script::Error("ground hazard size must be 1, 2 or 3");
+        hazards.push_back({ x, y, (int)size });
+        lua_pop(L, 1);
+    }
+    return hazards;
+}
+
+// map.hazard_clear(x1, y1, x2, y2, hazards) -> bool, including both endpoints.
+int MapHazardClear(lua_State* L) {
+    double points[4];
+    for (int i = 0; i < 4; ++i) {
+        points[i] = Script::ArgNumber(L, i+1);
+        if (!std::isfinite(points[i]) || std::abs(points[i]) > 65535)
+            throw Script::Error("ground hazard coordinates must be finite world coordinates");
+    }
+    const auto hazards = ReadGroundHazards(L, 5);
+    lua_pushboolean(L, Pathing::GroundHazardClear(hazards, points[0], points[1], points[2], points[3]));
+    return 1;
+}
+
 // map.safe_spot{ threats = { {x=, y=, weight=}, ... } [, target = {x=, y=}] [, range=7]
-//                [, radius=14] [, occupied=2.5] [, reach=9] }
-// -> { x, y, danger_here, danger_there, path = { {x, y}, ... } } or nil when no
-// reachable spot nearby is safer than standing still (trapped: fight).
+//                [, range_weight=0.15] [, radius=14] [, occupied=2.5] [, reach=9] [, heading={x=,y=}]
+//                [, heading_weight=0] }
+// Optional missiles = { {x, y, to_x, to_y}, ... } adds imminent flight lanes.
+// Optional hazards = { {x, y, size}, ... } adds confirmed ground-fire footprints.
+// -> { found, x, y, danger_here, danger_there, missile_here, missile_there,
+//      path = { {x, y}, ... } }; found is false when no safer spot is reachable.
 // Danger fades from each threat; cells beside a threat count as occupied and
 // routes avoid passing near threats. See Pathing::FindSafeSpot.
 int MapSafeSpot(lua_State* L) {
@@ -449,9 +647,30 @@ int MapSafeSpot(lua_State* L) {
     options.occupied = RawNumber(L, 1, "occupied", options.occupied);
     options.reach = RawNumber(L, 1, "reach", options.reach);
     options.range = RawNumber(L, 1, "range", options.range);
+    options.rangeWeight = RawNumber(L, 1, "range_weight", options.rangeWeight);
     options.lead = RawNumber(L, 1, "lead", options.lead);
     options.clearance = (int)RawNumber(L, 1, "clearance", options.clearance);
     if (options.radius < 2 || options.radius > 40) throw Script::Error("radius must be 2..40");
+    if (!std::isfinite(options.rangeWeight) || options.rangeWeight < 0 || options.rangeWeight > 4)
+        throw Script::Error("range_weight must be finite and 0..4");
+    Script::RawField(L, 1, "heading");
+    if (!lua_isnil(L, -1)) {
+        if (lua_type(L, -1) != LUA_TTABLE) throw Script::Error("heading must be a table with finite numeric x and y");
+        auto component = [&](const char* key) {
+            Script::RawField(L, -1, key);
+            if (lua_type(L, -1) != LUA_TNUMBER || !std::isfinite(lua_tonumber(L, -1)))
+                throw Script::Error("heading must be a table with finite numeric x and y");
+            const double value = lua_tonumber(L, -1);
+            lua_pop(L, 1);
+            return value;
+        };
+        options.headingX = component("x");
+        options.headingY = component("y");
+    }
+    lua_pop(L, 1);
+    options.headingWeight = RawNumber(L, 1, "heading_weight", options.headingWeight);
+    if (!std::isfinite(options.headingWeight) || options.headingWeight < 0 || options.headingWeight > 1)
+        throw Script::Error("heading_weight must be finite and 0..1");
     Script::RawField(L, 1, "target");
     if (lua_type(L, -1) == LUA_TTABLE) {
         options.hasTarget = true;
@@ -472,6 +691,27 @@ int MapSafeSpot(lua_State* L) {
         }
     }
     lua_pop(L, 1);
+    Script::RawField(L, 1, "missiles");
+    if (lua_type(L, -1) == LUA_TTABLE) {
+        const int count = (int)lua_objlen(L, -1);
+        if (count > 64) throw Script::Error("at most 64 missile lanes are supported");
+        for (int i = 1; i <= count; ++i) {
+            lua_rawgeti(L, -1, i);
+            if (lua_type(L, -1) != LUA_TTABLE) throw Script::Error("missile lane must be a table");
+            const Pathing::Missile missile = { RawNumber(L, -1, "x", NAN), RawNumber(L, -1, "y", NAN),
+                RawNumber(L, -1, "to_x", NAN), RawNumber(L, -1, "to_y", NAN) };
+            if (!std::isfinite(missile.x) || !std::isfinite(missile.y) || !std::isfinite(missile.toX) || !std::isfinite(missile.toY)
+                || std::abs(missile.x) > 65535 || std::abs(missile.y) > 65535
+                || std::abs(missile.toX) > 65535 || std::abs(missile.toY) > 65535)
+                throw Script::Error("missile coordinates must be finite world coordinates");
+            options.missiles.push_back(missile);
+            lua_pop(L, 1);
+        }
+    }
+    lua_pop(L, 1);
+    Script::RawField(L, 1, "hazards");
+    if (!lua_isnil(L, -1)) options.hazards = ReadGroundHazards(L, -1);
+    lua_pop(L, 1);
     // The snapshot holds walls and objects as they were; the game's live
     // collision also has monster footprints and doors as they are now.
     Room1* room = UnitRoom(player);
@@ -483,11 +723,15 @@ int MapSafeSpot(lua_State* L) {
     lua_createtable(L, 0, 7);
     Script::SetField(L, "found", spot.found);
     Script::SetField(L, "danger_here", spot.dangerHere);
+    Script::SetField(L, "missile_here", spot.missileHere);
+    Script::SetField(L, "hazard_here", spot.hazardHere);
     Script::SetField(L, "open_sectors", spot.openSectors);
     if (spot.found) {
         Script::SetField(L, "x", spot.spot.x);
         Script::SetField(L, "y", spot.spot.y);
         Script::SetField(L, "danger_there", spot.dangerThere);
+        Script::SetField(L, "missile_there", spot.missileThere);
+        Script::SetField(L, "hazard_there", spot.hazardThere);
     }
     lua_createtable(L, (int)spot.path.size(), 0);
     for (size_t i = 1; i < spot.path.size(); ++i) {
@@ -693,6 +937,34 @@ int MapExploreMark(lua_State* L) {
     return 0;
 }
 
+// map.explore_mark_rooms() -> cells newly marked: the ground of the room the
+// player stands in and of the rooms the game keeps beside it (Room1's near
+// list). Those are the rooms whose units the client holds, so what stands in
+// them is known without walking up to look: a search for monsters has
+// nothing more to find there, whatever sight alone has covered.
+int MapExploreMarkRooms(lua_State* L) {
+    Unit* player = RequirePlayer();
+    const LevelInfo& info = LoadLevel(player, UnitLevelId(player));
+    std::vector<uint8_t>& seen = SeenFor(player, info);
+    int marked = 0;
+    auto mark = [&](const Room1* room) {
+        if (!room || room->width <= 0 || room->height <= 0 || room->width > 400 || room->height > 400) return;
+        for (int y = room->y; y < room->y + room->height; ++y) {
+            for (int x = room->x; x < room->x + room->width; ++x) {
+                if (info.raw.LevelAt(x, y) != info.id) continue;
+                const size_t index = info.raw.Index(x, y);
+                if (!seen[index]) { seen[index] = 1; ++marked; }
+            }
+        }
+    };
+    if (Room1* here = UnitRoom(player)) {
+        mark(here);
+        for (int i = 0; i < here->nearCount && here->nearRooms; ++i) mark(here->nearRooms[i]);
+    }
+    lua_pushinteger(L, marked);
+    return 1;
+}
+
 // map.explore_next([minimum]) -> { x, y, steps, unseen, total } or nil when
 // nothing reachable is left unseen. The target is the reachable walkable cell
 // nearest by walking distance that is unseen and sits in a patch of at least
@@ -704,7 +976,7 @@ int MapExploreNext(lua_State* L) {
     const int id = UnitLevelId(player);
     const LevelInfo& info = LoadLevel(player, id);
     const std::vector<uint8_t>& seen = SeenFor(player, info);
-    const Pathing::Grid& grid = GridFor(player, { id });
+    const Pathing::Grid& grid = GridFor(player, { id }, true);
     int total = 0, unseen = 0;
     for (size_t i = 0; i < info.raw.blocked.size(); ++i) {
         if (info.raw.blocked[i] || info.raw.level[i] != id) continue;
@@ -721,38 +993,89 @@ int MapExploreNext(lua_State* L) {
         }
         return count;
     };
-    Pathing::Point start;
-    if (!Pathing::NearestPassable(grid, PlayerCell(player), 4, start)) return 0;
-    // Breadth-first over walkable cells of this level, nearest first.
-    std::vector<int32_t> steps(grid.blocked.size(), -1);
-    std::vector<int32_t> queue;
-    queue.reserve(4096);
-    const size_t first = grid.Index(start.x, start.y);
-    steps[first] = 0;
-    queue.push_back((int32_t)first);
-    static const int directions[8][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 } };
-    for (size_t head = 0; head < queue.size(); ++head) {
-        const int32_t current = queue[head];
-        const int x = grid.originX + current % grid.width, y = grid.originY + current / grid.width;
-        if (unseenAt(x, y) && patch(x, y) >= minimum) {
-            lua_createtable(L, 0, 5);
-            Script::SetField(L, "x", x);
-            Script::SetField(L, "y", y);
-            Script::SetField(L, "steps", steps[current]);
-            Script::SetField(L, "unseen", unseen);
-            Script::SetField(L, "total", total);
-            return 1;
-        }
-        for (const auto& d : directions) {
-            const int nx = x + d[0], ny = y + d[1];
-            if (!grid.Passable(nx, ny) || grid.LevelAt(nx, ny) != id) continue;
-            const size_t next = grid.Index(nx, ny);
-            if (steps[next] >= 0) continue;
-            steps[next] = steps[current] + 1;
-            queue.push_back((int32_t)next);
-        }
+    Pathing::Point start, target;
+    int distance = 0;
+    if (Pathing::NearestPassable(grid, PlayerCell(player), 4, start) &&
+        Pathing::FindNearest(grid, start, (uint16_t)id,
+            [&](int x, int y) { return unseenAt(x, y) && patch(x, y) >= minimum; }, target, distance)) {
+        lua_createtable(L, 0, 5);
+        Script::SetField(L, "x", target.x);
+        Script::SetField(L, "y", target.y);
+        Script::SetField(L, "steps", distance);
+        Script::SetField(L, "unseen", unseen);
+        Script::SetField(L, "total", total);
+        return 1;
     }
     return 0;
+}
+
+// map.explore_choose{minimum=24, cell=12, targets={{id,x,y},...},
+//                    exclude={{x,y},...}, heading_x=0, heading_y=0}
+// Always returns coverage and found; one flood chooses a monster or unseen patch.
+int MapExploreChoose(lua_State* L) {
+    Unit* player = RequirePlayer();
+    if (lua_type(L, 1) != LUA_TTABLE) throw Script::Error("bad argument #1 (table expected)");
+    auto number = [&](int table, const char* key, double fallback, double low, double high, bool integer = false) {
+        Script::RawField(L, table, key);
+        const double value = lua_isnil(L, -1) ? fallback : Script::ArgNumber(L, -1);
+        lua_pop(L, 1);
+        if (!std::isfinite(value) || value < low || value > high || (integer && value != std::floor(value)))
+            throw Script::Error(std::string(key) + " is outside the supported range");
+        return value;
+    };
+    Pathing::ExploreOptions options;
+    options.minimum = (int)number(1, "minimum", 24, 1, 1600, true);
+    options.cell = (int)number(1, "cell", 12, 4, 40, true);
+    options.headingX = number(1, "heading_x", 0, -65535, 65535);
+    options.headingY = number(1, "heading_y", 0, -65535, 65535);
+    auto readPoints = [&](const char* key, int limit, bool targets) {
+        Script::RawField(L, 1, key);
+        if (!lua_isnil(L, -1)) {
+            if (lua_type(L, -1) != LUA_TTABLE) throw Script::Error(std::string(key) + " must be a table");
+            const size_t count = lua_objlen(L, -1);
+            if (count > size_t(limit)) throw Script::Error(std::string(key) + " has too many entries");
+            for (size_t i = 1; i <= count; ++i) {
+                lua_rawgeti(L, -1, (int)i);
+                if (lua_type(L, -1) != LUA_TTABLE) throw Script::Error("exploration point must be a table");
+                const Pathing::Point point = {
+                    (int)std::floor(number(-1, "x", NAN, -65535, 65535)),
+                    (int)std::floor(number(-1, "y", NAN, -65535, 65535)) };
+                if (targets) options.targets.push_back({ (uint32_t)number(-1, "id", NAN, 0, UINT32_MAX, true), point });
+                else options.exclude.push_back(point);
+                lua_pop(L, 1);
+            }
+        }
+        lua_pop(L, 1);
+    };
+    readPoints("targets", 512, true);
+    readPoints("exclude", 64, false);
+    LARGE_INTEGER before, after, frequency;
+    QueryPerformanceCounter(&before);
+    const int id = UnitLevelId(player);
+    const LevelInfo& info = LoadLevel(player, id);
+    const std::vector<uint8_t>& seen = SeenFor(player, info);
+    const Pathing::Grid& grid = GridFor(player, { id }, true);
+    // GridFor with one level preserves its raw grid bounds and indexing.
+    Pathing::Point start;
+    Pathing::ExploreChoice choice;
+    if (Pathing::NearestPassable(grid, PlayerCell(player), 4, start))
+        choice = Pathing::ChooseExploration(grid, start, (uint16_t)id, seen, options);
+    QueryPerformanceCounter(&after);
+    QueryPerformanceFrequency(&frequency);
+    lua_createtable(L, 0, 10);
+    Script::SetField(L, "found", choice.found);
+    Script::SetField(L, "unseen", choice.unseen);
+    Script::SetField(L, "total", choice.total);
+    Script::SetField(L, "gain", choice.gain);
+    Script::SetField(L, "steps", choice.steps);
+    Script::SetField(L, "elapsed_ms", double(after.QuadPart - before.QuadPart) * 1000.0 / double(frequency.QuadPart));
+    if (choice.found) {
+        Script::SetField(L, "kind", choice.monster ? "monster" : "patch");
+        if (choice.monster) Script::SetField(L, "id", double(choice.id));
+        Script::SetField(L, "x", choice.point.x);
+        Script::SetField(L, "y", choice.point.y);
+    }
+    return 1;
 }
 
 // map.explore_plan([cell]) -> { {x, y}, ... }, milliseconds: a sweep of the
@@ -763,7 +1086,7 @@ int MapExplorePlan(lua_State* L) {
     const int cell = Script::OptInt(L, 1, 12);
     if (cell < 4 || cell > 40) throw Script::Error("cell must be 4..40");
     const int id = UnitLevelId(player);
-    const Pathing::Grid& grid = GridFor(player, { id });
+    const Pathing::Grid& grid = GridFor(player, { id }, true);
     Pathing::Point start;
     if (!Pathing::NearestPassable(grid, PlayerCell(player), 4, start)) return 0;
     LARGE_INTEGER before, after, frequency;
@@ -825,6 +1148,7 @@ const bool registered = (Script::RegisterModule(Script::InGame, [](lua_State* L)
         { "walkable", Script::Bind<MapWalkable> },
         { "line_clear", Script::Bind<MapLineClear> },
         { "safe_spot", Script::Bind<MapSafeSpot> },
+        { "hazard_clear", Script::Bind<MapHazardClear> },
         { "line_of_sight", Script::Bind<MapLineOfSight> },
         { "rooms", Script::Bind<MapRooms> },
         { "presets", Script::Bind<MapPresets> },
@@ -835,7 +1159,9 @@ const bool registered = (Script::RegisterModule(Script::InGame, [](lua_State* L)
         { "invalidate", Script::Bind<MapInvalidate> },
         { "explore_reset", Script::Bind<MapExploreReset> },
         { "explore_mark", Script::Bind<MapExploreMark> },
+        { "explore_mark_rooms", Script::Bind<MapExploreMarkRooms> },
         { "explore_next", Script::Bind<MapExploreNext> },
+        { "explore_choose", Script::Bind<MapExploreChoose> },
         { "explore_seen", Script::Bind<MapExploreSeen> },
         { "explore_plan", Script::Bind<MapExplorePlan> },
         { nullptr, nullptr },

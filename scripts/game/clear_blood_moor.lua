@@ -279,7 +279,7 @@ bot = fsm.new('start', {
     enter = function(m) m.data.talked = false end,
     tick = function(m)
       local me = game.me()
-      local akara = world.nearest(game.units('monster'), me, function(u) return u.name == 'Akara' end)
+      local akara = world.nearest(game.units('monster'), me, function(u) return u.class_id == 148 end)
       if not akara then
         -- Akara stands in the camp; head for its middle until she is in sight.
         if mover.status ~= 'moving' then

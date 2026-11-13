@@ -5,15 +5,25 @@
 #include "headers/ghidra.h"
 #include "headers/experience.h"
 #include "headers/experience_math.h"
+#include "headers/player_count.h"
+#include "headers/player_count_patch.h"
+
+namespace {
+    CharonPlayers::State configuredPlayers;
+}
+
+CharonPlayers::State CharonPlayers::Configured() { return configuredPlayers; }
 
 REMOTEREF(DWORD, PlayerCountOverride, 0x883d70);
 DWORD CALC_Experience = 0x57e3f0;
 REMOTEFUNC(Ghidra::D2ClientStrc* __fastcall, SUNIT_GetClient, (Ghidra::D2UnitStrc* pUnit, const char* szFile, int nLine), 0x5531c0)
 
 void __fastcall SetPlayerCount(DWORD count) {
-    PlayerCountOverride = count > 1 ? count : 1;
+    const DWORD configured = count > 1 ? count : 1;
+    PlayerCountOverride = configured;
+    configuredPlayers.Accept(configured);
     gamelog << "Difficulty (players) set to " << count << " and saved." << std::endl;
-    Settings["PlayerCountOverride"] = PlayerCountOverride;
+    Settings["PlayerCountOverride"] = configured;
     SaveSettings();
 }
 
@@ -35,13 +45,9 @@ namespace ExperienceMod {
         bool ingame = false;
     public:
         void init() {
+            configuredPlayers.ApplySaved(Settings["PlayerCountOverride"]);
             // Rewrite players count modification and leave to our handler - 42 bytes total
-            MemoryPatch(0x47c4e4)
-                << ASM::PUSHAD
-                << ASM::MOV_ECX_EAX
-                << CALL(SetPlayerCount)
-                << ASM::POPAD
-                << NOP_TO(0x47c50e);
+            CharonPlayers::InstallCommandPatch(0x47c4e4, SetPlayerCount);
 
             // Scale the engine-calculated award through the original unsigned XP ABI.
             MemoryPatch(0x57e4fa) << CALL(ExperienceIntercept);
@@ -76,7 +82,9 @@ namespace ExperienceMod {
 
         void gameLoop() {
             if (!ingame || PlayerCountOverride != Settings["PlayerCountOverride"]) {
-                PlayerCountOverride = Settings["PlayerCountOverride"];
+                const DWORD configured = Settings["PlayerCountOverride"];
+                PlayerCountOverride = configured;
+                configuredPlayers.ApplySaved(configured);
 
                 if (PlayerCountOverride > 1) {
                     gamelog << "Difficulty (players) set to " << PlayerCountOverride << "." << std::endl;
